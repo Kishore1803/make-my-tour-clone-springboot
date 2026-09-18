@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:8081/api",
+  baseURL: "https://make-my-tour-clone-springboot-backend.onrender.com/api",
 });
 
 // Get tracking status for one flight
