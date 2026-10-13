@@ -1,113 +1,90 @@
 package com.makemytrip.makemytrip.models;
 
-import java.time.LocalDate;
+import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
 @Entity
-@Table(name = "price_freeze")
+@Table(name = "price_freezes")
 public class PriceFreeze {
 	
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-	private Long userId;
+    private Long userId;
+    private String itemType;
+    private Long itemId;
 
-	private Long flightId;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal lockedPrice;
 
-	private Long hotelId;
+    private LocalDateTime createdAt;
+    private LocalDateTime expiresAt;
+    private String status;
 
-	private Double frozenPrice;
+    public PriceFreeze() {}
 
-	private LocalDateTime createdAt;
+    public Long getId() { 
+    	return id;
+    }
+    
+    public void setId(Long id) { 
+    	this.id = id;
+    }
 
-	private LocalDateTime expiresAt;
+    public Long getUserId() { 
+    	return userId;
+    }
+    
+    public void setUserId(Long userId) {
+    	this.userId = userId; 
+    }
 
-	private String status;
+    public String getItemType() { 
+    	return itemType;
+    }
+    
+    public void setItemType(String itemType) { 
+    	this.itemType = itemType; 
+    }
 
-	public PriceFreeze(Long id, Long userId, Long flightId, Long hotelId, Double frozenPrice, LocalDateTime createdAt,
-			LocalDateTime expiresAt, String status) {
-		this.id = id;
-		this.userId = userId;
-		this.flightId = flightId;
-		this.hotelId = hotelId;
-		this.frozenPrice = frozenPrice;
-		this.createdAt = createdAt;
-		this.expiresAt = expiresAt;
-		this.status = status;
-	}
-	
-	public PriceFreeze() {
-		
-	}
+    public Long getItemId() { 
+    	return itemId; 
+    }
+    public void setItemId(Long itemId) { 
+    	this.itemId = itemId; 
+    }
 
-	public Long getId() {
-		return id;
-	}
+    public BigDecimal getLockedPrice() { 
+    	return lockedPrice;
+    }
+    
+    public void setLockedPrice(BigDecimal lockedPrice) {
+        this.lockedPrice = lockedPrice;
+    }
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    public LocalDateTime getCreatedAt() { 
+    	return createdAt; 
+    }
+    
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 
-	public Long getUserId() {
-		return userId;
-	}
+    public LocalDateTime getExpiresAt() { 
+    	return expiresAt; 
+    }
+    
+    public void setExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
+    }
 
-	public void setUserId(Long userId) {
-		this.userId = userId;
-	}
-
-	public Long getFlightId() {
-		return flightId;
-	}
-
-	public void setFlightId(Long flightId) {
-		this.flightId = flightId;
-	}
-
-	public Long getHotelId() {
-		return hotelId;
-	}
-
-	public void setHotelId(Long hotelId) {
-		this.hotelId = hotelId;
-	}
-
-	public Double getFrozenPrice() {
-		return frozenPrice;
-	}
-
-	public void setFrozenPrice(Double frozenPrice) {
-		this.frozenPrice = frozenPrice;
-	}
-
-	public LocalDateTime getCreatedAt() {
-		return createdAt;
-	}
-
-	public void setCreatedAt(LocalDateTime localDateTime) {
-		this.createdAt = localDateTime;
-	}
-
-	public LocalDateTime getExpiresAt() {
-		return expiresAt;
-	}
-
-	public void setExpiresAt(LocalDateTime localDateTime) {
-		this.expiresAt = localDateTime;
-	}
-
-	public String getStatus() {
-		return status;
-	}
-
-	public void setStatus(String status) {
-		this.status = status;
-	}
+    public String getStatus() { 
+    	return status; 
+    }
+    
+    public void setStatus(String status) {
+    	this.status = status; 
+    }
 }

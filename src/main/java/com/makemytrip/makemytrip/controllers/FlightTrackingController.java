@@ -2,6 +2,7 @@ package com.makemytrip.makemytrip.controllers;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,11 +14,8 @@ import com.makemytrip.makemytrip.services.FlightTrackingService;
 @RequestMapping("/api/flight-tracking")
 public class FlightTrackingController {
 
-    private final FlightTrackingService service;
-
-    public FlightTrackingController(FlightTrackingService service) {
-        this.service = service;
-    }
+	@Autowired
+    private FlightTrackingService service;
 
     @GetMapping("/{userId}/{flightId}")
     public ResponseEntity<FlightTracking> getTracking(@PathVariable Long userId,@PathVariable Long flightId) {

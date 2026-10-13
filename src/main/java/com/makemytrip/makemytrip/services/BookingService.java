@@ -4,9 +4,11 @@ import com.makemytrip.makemytrip.models.Users;
 import com.makemytrip.makemytrip.models.Users.Booking;
 import com.makemytrip.makemytrip.models.Flight;
 import com.makemytrip.makemytrip.models.Hotel;
+import com.makemytrip.makemytrip.models.Seat;
 import com.makemytrip.makemytrip.repositories.UserRepository;
 import com.makemytrip.makemytrip.repositories.FlightRepository;
 import com.makemytrip.makemytrip.repositories.HotelRepository;
+import com.makemytrip.makemytrip.repositories.SeatRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,8 +26,11 @@ public class BookingService {
 
     @Autowired
     private HotelRepository hotelRepository;
+    
+    @Autowired
+    private SeatRepository seatRepository;
 
-    public Booking bookFlight(Long userId, Long flightId, int seats, double price){
+    public Booking bookFlight(Long userId, Long flightId, int seats, double price, String selectedSeat){
     	
         Optional<Users> usersOptional = userRepository.findById(userId);
         Optional<Flight> flightOptional = flightRepository.findById(flightId);
@@ -34,6 +39,13 @@ public class BookingService {
         	
             Users user = usersOptional.get();
             Flight flight = flightOptional.get();
+            
+            Seat seat = seatRepository.findByFlightIdAndSeatNumber(flightId, selectedSeat)
+                    .orElseThrow(() -> new RuntimeException("Selected seat not found"));
+
+            if (!seat.isAvailable()) {
+                throw new RuntimeException("Selected seat is already booked");
+            }
             
             if(flight.getAvailableSeats() >= seats){
             	
@@ -44,9 +56,13 @@ public class BookingService {
                 booking.setType("Flight");
                 booking.setBookingId(flightId);
                 booking.setDate(LocalDate.now().toString());
+                booking.setBookedAt(LocalDate.now().toString());
                 booking.setQuantity(seats);
                 booking.setTotalPrice(price);
                 user.getBookings().add(booking);
+                seat.setAvailable(false);
+                
+                seatRepository.save(seat);
                 userRepository.save(user);
                 return booking;
                 
@@ -68,6 +84,7 @@ public class BookingService {
             Hotel hotel = hotelOptional.get();
             
             if(hotel.getAvailableRooms() >= rooms){
+            	
                 hotel.setAvailableRooms(hotel.getAvailableRooms()- rooms);
                 hotelRepository.save(hotel);
 
@@ -78,6 +95,7 @@ public class BookingService {
                 booking.setQuantity(rooms);
                 booking.setTotalPrice(price);
                 user.getBookings().add(booking);
+                
                 userRepository.save(user);
                 return booking;
                 

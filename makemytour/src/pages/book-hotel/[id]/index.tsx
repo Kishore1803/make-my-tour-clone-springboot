@@ -28,13 +28,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+import { setUser } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
+
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
-import { setUser } from "@/store";
-
-import DynamicPricing from "@/components/Dynamic-Pricing/DynamicPricing";
+import DynamicPricing from "@/components/Dynamic-Pricing/DynamicPricingPanel";
+import ReviewSection from "@/components/Review/ReviewSection";
+import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
 
 interface Hotel {
   id: number;
@@ -149,11 +150,6 @@ const BookHotelPage = () => {
       area: "Candolim",
       distance: "7 minutes walk to Candolim Beach",
     },
-    reviews: {
-      rating: 3.8,
-      count: 784,
-      text: "Very Good",
-    },
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -175,37 +171,67 @@ const BookHotelPage = () => {
   const totalDiscounts = discountPerRoom * quantity;
   const grandTotal = totalPrice + totalTaxes - totalDiscounts;
 
-  const handleBooking = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleBooking = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!user) {
-      return;
+  if (!user?.id) {
+    alert("Please log in to book a hotel.");
+    return;
+  }
+
+  try {
+    const response = await handlehotelbooking(
+      user.id,
+      hotel.id,
+      quantity,
+      grandTotal,
+    );
+
+    // Handle either a raw object or an Axios response.
+    const bookingData = response?.data ?? response;
+
+    if (
+      !bookingData ||
+      typeof bookingData !== "object" ||
+      Array.isArray(bookingData)
+    ) {
+      throw new Error("Backend did not return valid booking data.");
     }
 
-    try {
-      const data = await handlehotelbooking(
-        user?.id,
-        hotel?.id,
-        quantity,
-        grandTotal,
-      );
+    const hotelBooking = {
+      ...bookingData,
+      bookingId: bookingData.bookingId ?? bookingData.id,
+      type: bookingData.type ?? "Hotel",
+      bookingType: bookingData.bookingType ?? "HOTEL",
+      totalPrice: bookingData.totalPrice ?? grandTotal,
+      quantity: bookingData.quantity ?? quantity,
+      date:
+        bookingData.date ??
+        bookingData.bookedAt ??
+        new Date().toISOString(),
+    };
 
-      alert("Hotel is Booked Successfully");
+    const currentBookings = Array.isArray(user.bookings)
+      ? user.bookings
+      : [];
 
-      const currentBookings = Array.isArray(user.bookings) ? user.bookings : [];
-      const updatedUser = {
+    dispatch(
+      setUser({
         ...user,
-        bookings: [...currentBookings, data],
-      };
-      dispatch(setUser(updatedUser));
-      setOpen(false);
-      setQuantity(1);
-      router.push("/profile");
-    } catch (error) {
-      console.error("Error while booking hotel:", error);
-      alert("Hotel booking failed");
-    }
-  };
+        bookings: [...currentBookings, hotelBooking],
+      }),
+    );
+
+    setOpen(false);
+    setQuantity(1);
+
+    alert("Hotel booked successfully!");
+    await router.push("/profile");
+  } catch (error) {
+    console.error("Hotel booking failed:", error);
+    alert("Hotel booking failed. Check the backend response.");
+  }
+};
 
   const HotelContent = () => (
     <DialogContent className="sm:max-w-[600px] bg-white">
@@ -439,6 +465,18 @@ const BookHotelPage = () => {
                 </button>
               </div>
             </div>
+
+            {/* Reviews & Ratings */}
+            <div
+              id="reviews"
+              className="bg-white rounded-xl shadow-lg p-6 mt-6"
+            >
+              <ReviewSection
+                itemId={hotel.id}
+                itemType="HOTEL"
+                currentUserId={user?.id}
+              />
+            </div>
           </div>
 
           <div className="lg:col-span-1">
@@ -446,12 +484,10 @@ const BookHotelPage = () => {
               {/* Dynamic Pricing */}
               {user && (
                 <div className="mt-6">
-                  <DynamicPricing
-                    type="hotel"
+                  <DynamicPricingPanel
+                    type="HOTEL"
                     itemId={hotel.id}
                     userId={user.id}
-                    basePrice={hotel.pricePerNight}
-                    availableCount={hotel.availableRooms}
                   />
                 </div>
               )}
@@ -459,7 +495,7 @@ const BookHotelPage = () => {
               <h3 className="text-xl font-semibold mb-4">
                 {hotelData.room.type}
               </h3>
-              
+
               <p className="text-gray-600 mb-4">{hotelData.room.capacity}</p>
               <ul className="space-y-3 mb-6">
                 {hotelData.room.features.map((feature, index) => (
@@ -552,46 +588,10 @@ const BookHotelPage = () => {
                 14 More Options
               </button>
             </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <div className="bg-blue-500 text-white text-2xl font-bold w-16 h-16 rounded-lg flex items-center justify-center">
-                    {hotelData.reviews.rating}
-                  </div>
-
-                  <div>
-                    <div className="font-semibold text-lg">
-                      {hotelData.reviews.text}
-                    </div>
-                    <div className="text-gray-500">
-                      ({hotelData.reviews.count} ratings)
-                    </div>
-                  </div>
-                </div>
-                <a href="#" className="text-blue-500">
-                  All Reviews
-                </a>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">
-                    {hotel.location}
-                  </h3>
-                </div>
-
-                <button type="button" className="text-blue-500">
-                  See on Map
-                </button>
-              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

@@ -184,14 +184,21 @@ export const edithotel = async (
   }
 };
 
-export const handleflightbooking = async (userId, flightId, seats, price) => {
+export const handleflightbooking = async (
+  userId,
+  flightId,
+  seats,
+  price,
+  selectedSeat,
+) => {
   try {
-    const url = `${BACKEND_URL}/booking/flight?userId=${userId}&flightId=${flightId}&seats=${seats}&price=${price}`;
+    const url = `${BACKEND_URL}/booking/flight?userId=${userId}&flightId=${flightId}&seats=${seats}&price=${price}&selectedSeat=${encodeURIComponent(selectedSeat)}`;
     const res = await axios.post(url);
     const data = res.data;
     return data;
   } catch (error) {
     console.log(error);
+    throw error;
   }
 };
 

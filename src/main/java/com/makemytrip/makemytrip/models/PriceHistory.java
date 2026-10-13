@@ -1,100 +1,112 @@
 package com.makemytrip.makemytrip.models;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "price_history")
 public class PriceHistory {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long flightId;
+    private String itemType;
+    private Long itemId;
 
-    private Long hotelId;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal basePrice;
 
-    private Double basePrice;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal finalPrice;
 
-    private Double dynamicPrice;
+    @Column(precision = 6, scale = 4)
+    private BigDecimal demandAdjustment;
 
-    private Double changePercentage;
+    @Column(precision = 6, scale = 4)
+    private BigDecimal seasonalAdjustment;
 
-    private String reason;
+    private boolean holiday;
+    private LocalDateTime recordedAt;
 
-    private LocalDateTime createdAt;
+    public PriceHistory() {}
 
-    public PriceHistory() {
+    @PrePersist
+    public void setRecordedAtIfMissing() {
+        if (recordedAt == null) {
+            recordedAt = LocalDateTime.now();
+        }
     }
 
-    public PriceHistory(Long flightId,Long hotelId, Double basePrice, Double dynamicPrice, Double changePercentage, String reason, LocalDateTime createdAt) {
-        this.flightId = flightId;
-        this.hotelId = hotelId;
-        this.basePrice = basePrice;
-        this.dynamicPrice = dynamicPrice;
-        this.changePercentage = changePercentage;
-        this.reason = reason;
-        this.createdAt = createdAt;
+    public Long getId() { 
+    	return id; 
+    }
+    
+    public void setId(Long id) { 
+    	this.id = id; 
     }
 
-    public Long getId() {
-        return id;
+    public String getItemType() { 
+    	return itemType; 
+    }
+    
+    public void setItemType(String itemType) { 
+    	this.itemType = itemType; 
     }
 
-    public Long getFlightId() {
-        return flightId;
+    public Long getItemId() { 
+    	return itemId; 
+    }
+    
+    public void setItemId(Long itemId) { 
+    	this.itemId = itemId; 
     }
 
-    public void setFlightId(Long flightId) {
-        this.flightId = flightId;
+    public BigDecimal getBasePrice() {
+    	return basePrice; 
+    }
+    
+    public void setBasePrice(BigDecimal basePrice) { 
+    	this.basePrice = basePrice;
     }
 
-    public Long getHotelId() {
-        return hotelId;
+    public BigDecimal getFinalPrice() { 
+    	return finalPrice; 
+    }
+    
+    public void setFinalPrice(BigDecimal finalPrice) { 
+    	this.finalPrice = finalPrice; 
     }
 
-    public void setHotelId(Long hotelId) {
-        this.hotelId = hotelId;
+    public BigDecimal getDemandAdjustment() {
+    	return demandAdjustment; 
+    }
+    
+    public void setDemandAdjustment(BigDecimal value) {
+        demandAdjustment = value;
     }
 
-    public Double getBasePrice() {
-        return basePrice;
+    public BigDecimal getSeasonalAdjustment() {
+    	return seasonalAdjustment;
+    }
+    
+    public void setSeasonalAdjustment(BigDecimal value) {
+        seasonalAdjustment = value;
     }
 
-    public void setBasePrice(Double basePrice) {
-        this.basePrice = basePrice;
+    public boolean isHoliday() { 
+    	return holiday; 
+    }
+    
+    public void setHoliday(boolean holiday) { 
+    	this.holiday = holiday; 
     }
 
-    public Double getDynamicPrice() {
-        return dynamicPrice;
+    public LocalDateTime getRecordedAt() { 
+    	return recordedAt;
     }
-
-    public void setDynamicPrice(Double dynamicPrice) {
-        this.dynamicPrice = dynamicPrice;
-    }
-
-    public Double getChangePercentage() {
-        return changePercentage;
-    }
-
-    public void setChangePercentage(Double changePercentage) {
-        this.changePercentage = changePercentage;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public void setReason(String reason) {
-        this.reason = reason;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    
+    public void setRecordedAt(LocalDateTime recordedAt) {
+        this.recordedAt = recordedAt;
     }
 }

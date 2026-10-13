@@ -16,7 +16,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/admin")
-@CrossOrigin(origins = "*")
 public class AdminController {
 	
     @Autowired
@@ -61,6 +60,7 @@ public class AdminController {
             flightRepository.save(flight);
             return  ResponseEntity.ok(flight);
         }
+        
         return ResponseEntity.notFound().build();
     }
     
@@ -79,6 +79,7 @@ public class AdminController {
             hotelRepository.save(hotel);
             return ResponseEntity.ok(hotel);
         }
+        
         return ResponseEntity.notFound().build();
     }
 }

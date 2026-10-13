@@ -1,140 +1,148 @@
-"use client";
+import { useEffect, useState } from "react";
+import { freezePrice, getPriceFreeze } from "@/api/pricingApi";
+import type { ItemType, PriceFreezeResponse } from "@/types/pricing";
 
-interface PriceFreezeCardProps {
-  type: "flight" | "hotel";
-  frozenPrice: number;
-  createdAt: string;
-  expiresAt: string;
-  status: string;
-  onFreeze?: () => void;
-  loading?: boolean;
+interface Props {
+  type: ItemType;
+  itemId: number;
+  userId: number;
+  onFrozen: () => void;
 }
 
-const PriceFreezeCard = ({
+export default function PriceFreezeCard({
   type,
-  frozenPrice,
-  createdAt,
-  expiresAt,
-  status,
-  onFreeze,
-  loading = false,
-}: PriceFreezeCardProps) => {
-  const isActive = status.toUpperCase() === "ACTIVE";
-  const formatDate = (dateValue: string) => {
-    if (!dateValue) {
-      return "-";
+  itemId,
+  userId,
+  onFrozen,
+}: Props) {
+  const [freeze, setFreeze] = useState<PriceFreezeResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [remaining, setRemaining] = useState("");
+
+  useEffect(() => {
+    if (!freeze?.freezeId || freeze.status !== "ACTIVE") return;
+
+    let cancelled = false;
+
+    const check = async () => {
+      try {
+        const latest = await getPriceFreeze(freeze.freezeId);
+        if (!cancelled) setFreeze(latest);
+      } catch {
+        // Keep the last known status if the request fails.
+      }
+    };
+
+    const timer = window.setInterval(() => void check(), 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [freeze?.freezeId, freeze?.status]);
+
+  useEffect(() => {
+    if (!freeze?.expiresAt || freeze.status !== "ACTIVE") {
+      setRemaining("");
+      return;
     }
 
-    return new Date(dateValue).toLocaleString("en-IN", {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
+    const update = () => {
+      const milliseconds = new Date(freeze.expiresAt).getTime() - Date.now();
+
+      if (milliseconds <= 0) {
+        setRemaining("Expiry reached — checking status...");
+        return;
+      }
+
+      const seconds = Math.floor(milliseconds / 1000);
+      setRemaining(
+        `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s remaining`,
+      );
+    };
+
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [freeze?.expiresAt, freeze?.status]);
+
+  const handleFreeze = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const result = await freezePrice(type, itemId, userId);
+      setFreeze(result);
+      onFrozen();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          "Unable to freeze the price. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="h-6 w-40 animate-pulse rounded bg-gray-200" />
-        <div className="mt-5 h-10 w-32 animate-pulse rounded bg-gray-200" />
-        <div className="mt-5 space-y-3">
-          <div className="h-5 animate-pulse rounded bg-gray-100" />
-          <div className="h-5 animate-pulse rounded bg-gray-100" />
-        </div>
-      </div>
-    );
-  }
+  const active =
+    freeze?.status === "ACTIVE" &&
+    new Date(freeze.expiresAt).getTime() > Date.now();
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500">
-            {type === "flight" ? "Flight Price Freeze" : "Hotel Price Freeze"}
-          </p>
-
-          <h3 className="mt-1 text-xl font-bold text-gray-900">
-            {isActive ? "Price Protected" : "Price Freeze Expired"}
-          </h3>
-        </div>
-
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            isActive ? "bg-green-100" : "bg-gray-100"
-          }`}
-        >
-          <span>{type === "flight" ? "✈️" : "🏨"}</span>
-        </div>
-      </div>
-
-      {/* Status */}
-      <div className="mt-5">
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            isActive
-              ? "bg-green-100 text-green-700"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {status}
+    <section className="rounded-2xl border bg-white p-5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl" aria-hidden="true">
+          🔒
         </span>
-      </div>
-
-      {/* Frozen Price */}
-      <div className="mt-5 rounded-xl bg-gray-50 p-4">
-        <p className="text-sm text-gray-500">Frozen Price</p>
-        <p className="mt-1 text-3xl font-bold text-gray-900">
-          ₹{frozenPrice.toLocaleString("en-IN")}
-        </p>
-      </div>
-
-      {/* Details */}
-      <div className="mt-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Frozen On</span>
-          <span className="text-sm font-medium text-gray-700">
-            {formatDate(createdAt)}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">Expires On</span>
-          <span className="text-sm font-medium text-gray-700">
-            {formatDate(expiresAt)}
-          </span>
-        </div>
-      </div>
-
-      {/* Active Message */}
-      {isActive && (
-        <div className="mt-5 rounded-xl border border-green-100 bg-green-50 p-3">
-          <p className="text-sm font-medium text-green-700">
-            Your price is protected until the expiry time.
+        <div>
+          <h3 className="font-semibold text-gray-900">Freeze your price</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Lock your quoted price for 30 minutes.
           </p>
         </div>
-      )}
+      </div>
 
-      {/* Expired Message */}
-      {!isActive && (
-        <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-3">
-          <p className="text-sm text-gray-600">
-            This price freeze is no longer active.
+      {active && freeze ? (
+        <div className="mt-4 rounded-xl bg-green-50 p-4 text-green-800">
+          <p className="font-semibold">Price freeze active</p>
+          <p className="mt-2 text-xl font-bold">
+            {new Intl.NumberFormat("en-IN", {
+              style: "currency",
+              currency: "INR",
+              maximumFractionDigits: 2,
+            }).format(freeze.lockedPrice)}
+          </p>
+          <p className="mt-2 text-sm">{remaining}</p>
+          <p className="mt-1 text-xs">
+            Expires: {new Date(freeze.expiresAt).toLocaleString("en-IN")}
           </p>
         </div>
-      )}
-
-      {/* Freeze Again */}
-      {onFreeze && !isActive && (
+      ) : (
         <button
           type="button"
-          onClick={onFreeze}
-          className="mt-5 w-full rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+          onClick={() => void handleFreeze()}
+          disabled={loading}
+          className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Freeze Current Price
+          {loading
+            ? "Freezing price..."
+            : freeze?.status === "EXPIRED"
+              ? "Freeze price again"
+              : "Freeze current price"}
         </button>
       )}
-    </div>
-  );
-};
 
-export default PriceFreezeCard;
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      <p className="mt-4 text-xs leading-5 text-gray-500">
+        Freezing a price does not book the flight or hotel. Checkout must
+        validate the freeze before accepting the locked amount.
+      </p>
+    </section>
+  );
+}

@@ -36,11 +36,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import SignupDialog from "@/components/SignupDialog";
-import Loader from "@/components/Loader";
 import { setUser } from "@/store";
 
-import DynamicPricing from "@/components/Dynamic-Pricing/DynamicPricing";
+import SignupDialog from "@/components/SignupDialog";
+import Loader from "@/components/Loader";
+import FlightSeatMap from "@/components/SeatRoom/FlightSeatMap";
+import ReviewSection from "@/components/Review/ReviewSection";
+import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
 
 interface Flight {
   id: number;
@@ -79,6 +81,7 @@ const BookFlightPage = () => {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
+  const [selectedSeat, setSelectedSeat] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
   const user = useSelector((state: any) => state.user.user) as User | null;
   const dispatch = useDispatch();
@@ -141,6 +144,7 @@ const BookFlightPage = () => {
     if (difference <= 0) {
       return "Non Stop";
     }
+
     const totalMinutes = Math.floor(difference / (1000 * 60));
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
@@ -247,12 +251,18 @@ const BookFlightPage = () => {
       return;
     }
 
+    if (!selectedSeat) {
+      alert("Please select a seat before booking");
+      return;
+    }
+
     try {
       const bookingData = await handleflightbooking(
         user.id,
         flight.id,
         quantity,
         grandTotal,
+        selectedSeat.seatNumber,
       );
 
       alert("Flight is Booked Successfully");
@@ -357,6 +367,13 @@ const BookFlightPage = () => {
             </p>
           </div>
         </div>
+
+        {/* Seat Selection */}
+        <FlightSeatMap
+          flightId={flight.id}
+          selectedSeat={selectedSeat}
+          onSeatSelect={(seat) => setSelectedSeat(seat)}
+        />
 
         <div className="bg-gray-100 rounded-lg p-4">
           <h3 className="text-lg font-bold mb-4 flex items-center">
@@ -528,12 +545,10 @@ const BookFlightPage = () => {
 
             {/* Dynamic Pricing */}
             {user && (
-              <DynamicPricing
-                type="flight"
+              <DynamicPricingPanel
+                type="FLIGHT"
                 itemId={flight.id}
                 userId={user.id}
-                basePrice={flight.price}
-                availableCount={flight.availableSeats}
               />
             )}
 
@@ -575,6 +590,14 @@ const BookFlightPage = () => {
                   <span>Now</span>
                   <span>{formatDate(flight.departureTime)}</span>
                   <span>Departure</span>
+                </div>
+                
+                <div id="reviews" className="bg-white rounded-xl shadow-sm p-6">
+                  <ReviewSection
+                    itemId={flight.id}
+                    itemType="FLIGHT"
+                    currentUserId={user?.id}
+                  />
                 </div>
               </div>
             </div>

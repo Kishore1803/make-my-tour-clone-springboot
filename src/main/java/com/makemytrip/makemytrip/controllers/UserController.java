@@ -8,7 +8,6 @@ import com.makemytrip.makemytrip.services.UserServices;
 
 @RestController
 @RequestMapping("/user")
-@CrossOrigin(origins = "*")
 public class UserController {
 	
     @Autowired
@@ -30,6 +29,7 @@ public class UserController {
         if(user != null){
             return ResponseEntity.ok(user);
         }
+        
         return ResponseEntity.notFound().build();
     }
     
