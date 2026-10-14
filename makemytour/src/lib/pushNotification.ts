@@ -1,4 +1,4 @@
-import { savePushSubscription } from "@/api/FlightStatusApi";
+import { savePushSubscription } from "@/api/FlightStatusapi";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "";
 

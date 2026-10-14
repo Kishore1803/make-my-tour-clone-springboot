@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getAllFlights,
   getFlightStatus,
-} from "@/api/FlightStatusApi";
+} from "@/api/FlightStatusapi";
 
 import EnableFlightNotifications from "./EnableFlightNotification";
 import FlightSearch from "./FlightSearch";

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import axios from "axios";
-import { getFlightStatus, searchFlights } from "@/api/FlightStatusApi";
+import { getFlightStatus, searchFlights } from "@/api/FlightStatusapi";
 
 interface FlightSearchProps {
   onResults: (flights: any[]) => void;
