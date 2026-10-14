@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getCurrentPrice, getPriceHistory } from "@/api/pricingApi";
+import { getCurrentPrice, getPriceHistory } from "@/api/PricingApi";
 
 import type {
   ItemType,
