@@ -1,18 +1,15 @@
-import type { AxiosInstance } from "axios";
+type ItemType = "FLIGHT" | "HOTEL";
 
 export function getCurrentPrice(
-  type: "FLIGHT" | "HOTEL",
+  type: ItemType,
   itemId: number,
-  userId?: number | null,
+  userId: number | null,
 ): Promise<any>;
 
-export function getPriceHistory(
-  type: "FLIGHT" | "HOTEL",
-  itemId: number,
-): Promise<any[]>;
+export function getPriceHistory(type: ItemType, itemId: number): Promise<any[]>;
 
 export function freezePrice(
-  type: "FLIGHT" | "HOTEL",
+  type: ItemType,
   itemId: number,
   userId: number,
 ): Promise<any>;
@@ -20,7 +17,7 @@ export function freezePrice(
 export function getPriceFreeze(freezeId: number): Promise<any>;
 
 export function updatePricing(
-  type: "FLIGHT" | "HOTEL",
+  type: ItemType,
   itemId: number,
   pricing: {
     basePrice: number;
@@ -30,6 +27,6 @@ export function updatePricing(
   },
 ): Promise<any>;
 
-declare const pricingApi: AxiosInstance;
+declare const pricingApi: import("axios").AxiosInstance;
 
 export default pricingApi;

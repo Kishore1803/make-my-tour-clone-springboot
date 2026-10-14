@@ -26,7 +26,7 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
   const refresh = useCallback(async () => {
     try {
       const [current, records] = await Promise.all([
-        getCurrentPrice(type, itemId, userId),
+        getCurrentPrice(type, itemId, userId as number | null),
         getPriceHistory(type, itemId),
       ]);
 
@@ -49,7 +49,7 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
     const load = async () => {
       try {
         const [current, records] = await Promise.all([
-          getCurrentPrice(type, itemId, userId),
+          getCurrentPrice(type, itemId, userId as number | null),
           getPriceHistory(type, itemId),
         ]);
 
