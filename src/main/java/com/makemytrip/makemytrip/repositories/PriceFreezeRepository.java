@@ -6,6 +6,6 @@ import java.util.Optional;
 
 public interface PriceFreezeRepository extends JpaRepository<PriceFreeze, Long> {
 
-    Optional<PriceFreeze>
-    findFirstByUserIdAndItemTypeAndItemIdAndStatusOrderByExpiresAtDesc(Long userId, String itemType, Long itemId, String status);
+    Optional<PriceFreeze> findFirstByUserIdAndItemTypeAndItemIdAndStatusOrderByExpiresAtDesc
+    (Long userId, String itemType,Long itemId, String status);
 }

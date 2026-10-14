@@ -1,148 +1,144 @@
-// import { useEffect, useState } from "react";
-// import { freezePrice, getPriceFreeze } from "@/api/PricingApi";
-// import type { ItemType, PriceFreezeResponse } from "@/types/pricing";
+import { useEffect, useState } from "react";
+import { freezePrice, getPriceFreeze } from "@/api/PricingApi";
+import type { ItemType, PriceFreezeResponse } from "@/types/pricing";
 
-// interface Props {
-//   type: ItemType;
-//   itemId: number;
-//   userId: number;
-//   onFrozen: () => void;
-// }
+interface Props {
+  type: ItemType;
+  itemId: number;
+  userId: number;
+  onFrozen: () => void;
+}
 
-// export default function PriceFreezeCard({
-//   type,
-//   itemId,
-//   userId,
-//   onFrozen,
-// }: Props) {
-//   const [freeze, setFreeze] = useState<PriceFreezeResponse | null>(null);
-//   const [loading, setLoading] = useState(false);
-//   const [error, setError] = useState("");
-//   const [remaining, setRemaining] = useState("");
+const money = (value: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(value);
 
-//   useEffect(() => {
-//     if (!freeze?.freezeId || freeze.status !== "ACTIVE") return;
+export default function PriceFreezeCard({
+  type,
+  itemId,
+  userId,
+  onFrozen,
+}: Props) {
+  const [freeze, setFreeze] = useState<PriceFreezeResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [remaining, setRemaining] = useState("");
 
-//     let cancelled = false;
+  useEffect(() => {
+    if (!freeze || freeze.status !== "ACTIVE") return;
+    let cancelled = false;
 
-//     const check = async () => {
-//       try {
-//         const latest = await getPriceFreeze(freeze.freezeId);
-//         if (!cancelled) setFreeze(latest);
-//       } catch {
-//         // Keep the last known status if the request fails.
-//       }
-//     };
+    const checkStatus = async () => {
+      try {
+        const data = await getPriceFreeze(freeze.freezeId);
+        if (!cancelled) setFreeze(data);
+      } catch {
+        // Keep last known status during a temporary network error.
+      }
+    };
 
-//     const timer = window.setInterval(() => void check(), 15000);
+    const timer = window.setInterval(() => void checkStatus(), 15000);
 
-//     return () => {
-//       cancelled = true;
-//       window.clearInterval(timer);
-//     };
-//   }, [freeze?.freezeId, freeze?.status]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [freeze?.freezeId, freeze?.status]);
 
-//   useEffect(() => {
-//     if (!freeze?.expiresAt || freeze.status !== "ACTIVE") {
-//       setRemaining("");
-//       return;
-//     }
+  useEffect(() => {
+    if (!freeze || freeze.status !== "ACTIVE") {
+      setRemaining("");
+      return;
+    }
 
-//     const update = () => {
-//       const milliseconds = new Date(freeze.expiresAt).getTime() - Date.now();
+    const updateCountdown = () => {
+      const ms = new Date(freeze.expiresAt).getTime() - Date.now();
 
-//       if (milliseconds <= 0) {
-//         setRemaining("Expiry reached — checking status...");
-//         return;
-//       }
+      if (ms <= 0) {
+        setRemaining("Checking expiry...");
+        return;
+      }
 
-//       const seconds = Math.floor(milliseconds / 1000);
-//       setRemaining(
-//         `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s remaining`,
-//       );
-//     };
+      const seconds = Math.floor(ms / 1000);
 
-//     update();
-//     const timer = window.setInterval(update, 1000);
-//     return () => window.clearInterval(timer);
-//   }, [freeze?.expiresAt, freeze?.status]);
+      setRemaining(
+        `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(
+          2,
+          "0",
+        )}s remaining`,
+      );
+    };
 
-//   const handleFreeze = async () => {
-//     setLoading(true);
-//     setError("");
+    updateCountdown();
 
-//     try {
-//       const result = await freezePrice(type, itemId, userId);
-//       setFreeze(result);
-//       onFrozen();
-//     } catch (err: any) {
-//       setError(
-//         err?.response?.data?.message ||
-//           "Unable to freeze the price. Please try again.",
-//       );
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+    const timer = window.setInterval(updateCountdown, 1000);
 
-//   const active =
-//     freeze?.status === "ACTIVE" &&
-//     new Date(freeze.expiresAt).getTime() > Date.now();
+    return () => window.clearInterval(timer);
+  }, [freeze?.expiresAt, freeze?.status]);
 
-//   return (
-//     <section className="rounded-2xl border bg-white p-5 shadow-sm">
-//       <div className="flex items-start gap-3">
-//         <span className="text-2xl" aria-hidden="true">
-//           🔒
-//         </span>
-//         <div>
-//           <h3 className="font-semibold text-gray-900">Freeze your price</h3>
-//           <p className="mt-1 text-sm text-gray-500">
-//             Lock your quoted price for 30 minutes.
-//           </p>
-//         </div>
-//       </div>
+  const handleFreeze = async () => {
+    setLoading(true);
+    setError("");
 
-//       {active && freeze ? (
-//         <div className="mt-4 rounded-xl bg-green-50 p-4 text-green-800">
-//           <p className="font-semibold">Price freeze active</p>
-//           <p className="mt-2 text-xl font-bold">
-//             {new Intl.NumberFormat("en-IN", {
-//               style: "currency",
-//               currency: "INR",
-//               maximumFractionDigits: 2,
-//             }).format(freeze.lockedPrice)}
-//           </p>
-//           <p className="mt-2 text-sm">{remaining}</p>
-//           <p className="mt-1 text-xs">
-//             Expires: {new Date(freeze.expiresAt).toLocaleString("en-IN")}
-//           </p>
-//         </div>
-//       ) : (
-//         <button
-//           type="button"
-//           onClick={() => void handleFreeze()}
-//           disabled={loading}
-//           className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-//         >
-//           {loading
-//             ? "Freezing price..."
-//             : freeze?.status === "EXPIRED"
-//               ? "Freeze price again"
-//               : "Freeze current price"}
-//         </button>
-//       )}
+    try {
+      const data = await freezePrice(type, itemId, userId);
+      setFreeze(data);
+      onFrozen();
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message || "Unable to freeze price. Try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-//       {error && (
-//         <p role="alert" className="mt-3 text-sm text-red-600">
-//           {error}
-//         </p>
-//       )}
+  const isActive =
+    freeze?.status === "ACTIVE" &&
+    new Date(freeze.expiresAt).getTime() > Date.now();
 
-//       <p className="mt-4 text-xs leading-5 text-gray-500">
-//         Freezing a price does not book the flight or hotel. Checkout must
-//         validate the freeze before accepting the locked amount.
-//       </p>
-//     </section>
-//   );
-// }
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-bold text-gray-900">🔒 Freeze your price</h3>
+      <p className="mt-1 text-sm text-gray-500">
+        Lock the current quote for 30 minutes.
+      </p>
+
+      {isActive && freeze ? (
+        <div className="mt-4 rounded-xl bg-green-50 p-4">
+          <p className="font-semibold text-green-800">Price freeze active</p>
+          <p className="mt-2 text-2xl font-bold text-green-900">
+            {money(freeze.lockedPrice)}
+          </p>
+          <p className="mt-2 text-sm text-green-800">{remaining}</p>
+          <p className="mt-1 text-xs text-green-800">
+            Expires: {new Date(freeze.expiresAt).toLocaleString("en-IN")}
+          </p>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void handleFreeze()}
+          disabled={loading || userId <= 0}
+          className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? "Freezing price..." : "Freeze current price"}
+        </button>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-600">
+          {error}
+        </p>
+      )}
+
+      <p className="mt-4 text-xs text-gray-500">
+        A freeze does not book the ticket or room. Checkout must validate the
+        freeze on the backend.
+      </p>
+    </section>
+  );
+}

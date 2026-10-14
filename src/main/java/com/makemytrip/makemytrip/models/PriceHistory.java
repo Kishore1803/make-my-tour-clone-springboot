@@ -5,107 +5,98 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "price_history")
+@Table(
+    name = "price_history",
+    indexes = {
+        @Index(
+            name = "idx_price_history_item",
+            columnList = "item_type,item_id,recorded_at"
+        )
+    }
+)
 public class PriceHistory {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "item_type", nullable = false, length = 16)
     private String itemType;
+
+    @Column(name = "item_id", nullable = false)
     private Long itemId;
 
-    @Column(precision = 12, scale = 2)
+    @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
 
-    @Column(precision = 12, scale = 2)
+    @Column(name = "final_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalPrice;
 
-    @Column(precision = 6, scale = 4)
-    private BigDecimal demandAdjustment;
+    @Column(name = "change_percentage", nullable = false, precision = 7, scale = 2)
+    private BigDecimal changePercentage = BigDecimal.ZERO;
 
-    @Column(precision = 6, scale = 4)
-    private BigDecimal seasonalAdjustment;
-
-    private boolean holiday;
+    @Column(name = "recorded_at", nullable = false)
     private LocalDateTime recordedAt;
 
-    public PriceHistory() {}
-
     @PrePersist
-    public void setRecordedAtIfMissing() {
+    public void onCreate() {
         if (recordedAt == null) {
             recordedAt = LocalDateTime.now();
         }
+
+        if (changePercentage == null) {
+            changePercentage = BigDecimal.ZERO;
+        }
     }
 
-    public Long getId() { 
-    	return id; 
-    }
-    
-    public void setId(Long id) { 
-    	this.id = id; 
+    public Long getId() {
+        return id;
     }
 
-    public String getItemType() { 
-    	return itemType; 
-    }
-    
-    public void setItemType(String itemType) { 
-    	this.itemType = itemType; 
+    public String getItemType() {
+        return itemType;
     }
 
-    public Long getItemId() { 
-    	return itemId; 
+    public void setItemType(String itemType) {
+        this.itemType = itemType;
     }
-    
-    public void setItemId(Long itemId) { 
-    	this.itemId = itemId; 
+
+    public Long getItemId() {
+        return itemId;
+    }
+
+    public void setItemId(Long itemId) {
+        this.itemId = itemId;
     }
 
     public BigDecimal getBasePrice() {
-    	return basePrice; 
-    }
-    
-    public void setBasePrice(BigDecimal basePrice) { 
-    	this.basePrice = basePrice;
+        return basePrice;
     }
 
-    public BigDecimal getFinalPrice() { 
-    	return finalPrice; 
-    }
-    
-    public void setFinalPrice(BigDecimal finalPrice) { 
-    	this.finalPrice = finalPrice; 
+    public void setBasePrice(BigDecimal basePrice) {
+        this.basePrice = basePrice;
     }
 
-    public BigDecimal getDemandAdjustment() {
-    	return demandAdjustment; 
-    }
-    
-    public void setDemandAdjustment(BigDecimal value) {
-        demandAdjustment = value;
+    public BigDecimal getFinalPrice() {
+        return finalPrice;
     }
 
-    public BigDecimal getSeasonalAdjustment() {
-    	return seasonalAdjustment;
-    }
-    
-    public void setSeasonalAdjustment(BigDecimal value) {
-        seasonalAdjustment = value;
+    public void setFinalPrice(BigDecimal finalPrice) {
+        this.finalPrice = finalPrice;
     }
 
-    public boolean isHoliday() { 
-    	return holiday; 
-    }
-    
-    public void setHoliday(boolean holiday) { 
-    	this.holiday = holiday; 
+    public BigDecimal getChangePercentage() {
+        return changePercentage;
     }
 
-    public LocalDateTime getRecordedAt() { 
-    	return recordedAt;
+    public void setChangePercentage(BigDecimal changePercentage) {
+        this.changePercentage = changePercentage;
     }
-    
+
+    public LocalDateTime getRecordedAt() {
+        return recordedAt;
+    }
+
     public void setRecordedAt(LocalDateTime recordedAt) {
         this.recordedAt = recordedAt;
     }

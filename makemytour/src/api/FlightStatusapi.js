@@ -19,7 +19,7 @@ export const getFlightsByStatus = (status) =>
 export const createFlight = (flightData) => API.post("", flightData);
 
 const PUSH_API =
-  "http://localhost:8081/api/push";
+  "https://make-my-tour-clone-springboot-backend.onrender.com/api/push";
 
 export const savePushSubscription = (subscription) =>
   axios.post(`${PUSH_API}/subscribe`, {

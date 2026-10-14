@@ -34,7 +34,7 @@ import { useDispatch, useSelector } from "react-redux";
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
 import ReviewSection from "@/components/Review/ReviewSection";
-// import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
+import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
 
 interface Hotel {
   id: number;
@@ -480,7 +480,7 @@ const handleBooking = async (e: React.FormEvent) => {
 
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-lg p-6">
-              {/* {user && (
+              {user && (
                 <div className="mt-6">
                   <DynamicPricingPanel
                     type="HOTEL"
@@ -488,7 +488,7 @@ const handleBooking = async (e: React.FormEvent) => {
                     userId={user.id}
                   />
                 </div>
-              )} */}
+              )}
 
               <h3 className="text-xl font-semibold mb-4">
                 {hotelData.room.type}
