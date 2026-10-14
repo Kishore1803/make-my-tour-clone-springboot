@@ -35,6 +35,7 @@ public class Users {
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "user_bookings", joinColumns = @JoinColumn(name = "user_id"))
+    
     private List<Booking> bookings = new ArrayList<>();
 
     public Users() {

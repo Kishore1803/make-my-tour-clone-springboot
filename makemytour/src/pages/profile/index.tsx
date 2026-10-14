@@ -866,17 +866,6 @@ const Index = () => {
             </div>
           )}
         </div>
-
-        {/* General policy link */}
-        <div className="mt-8 text-center">
-          <button
-            type="button"
-            onClick={() => router.push("/cancellation-policy")}
-            className="text-sm font-medium text-red-600 hover:text-red-700 underline underline-offset-4"
-          >
-            View General Cancellation & Refund Policy
-          </button>
-        </div>
       </div>
     </div>
   );

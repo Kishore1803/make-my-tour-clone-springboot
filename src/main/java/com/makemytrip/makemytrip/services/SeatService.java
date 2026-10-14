@@ -17,6 +17,10 @@ public class SeatService {
     public List<Seat> getSeatsByFlight(Long flightId) {
         return seatRepository.findByFlightIdOrderBySeatNumberAsc(flightId);
     }
+    
+    public Seat createSeat(Seat seat) {
+        return seatRepository.save(seat);
+    }
 
     public List<Seat> getAvailableSeats(Long flightId) {
         return seatRepository.findByFlightIdAndAvailableTrue(flightId);

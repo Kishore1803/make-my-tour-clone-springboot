@@ -8,7 +8,8 @@ import java.util.Optional;
 
 public interface SeatRepository extends JpaRepository<Seat, Long> {
 
-    List<Seat> findByFlightIdOrderBySeatNumberAsc(Long flightId);
-    Optional<Seat> findByFlightIdAndSeatNumber(Long flightId, String seatNumber);
+    List<Seat> findByFlightId(Long flightId);
     List<Seat> findByFlightIdAndAvailableTrue(Long flightId);
+    Optional<Seat> findByFlightIdAndSeatNumber(Long flightId, String seatNumber);
+	List<Seat> findByFlightIdOrderBySeatNumberAsc(Long flightId);
 }

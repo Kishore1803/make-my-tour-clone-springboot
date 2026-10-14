@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API = axios.create({
   baseURL:
-    "https://make-my-tour-clone-springboot-backend.onrender.comhttp://localhost:8081/api/flight-status",
+    "https://make-my-tour-clone-springboot-backend.onrender.com/api/flight-status",
 });
 
 export const getAllFlights = () => API.get("");
