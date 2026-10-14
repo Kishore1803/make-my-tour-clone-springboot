@@ -42,7 +42,7 @@ import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
 import FlightSeatMap from "@/components/SeatRoom/FlightSeatMap";
 import ReviewSection from "@/components/Review/ReviewSection";
-import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
+// import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
 
 interface Flight {
   id: number;
@@ -544,13 +544,13 @@ const BookFlightPage = () => {
             </div>
 
             {/* Dynamic Pricing */}
-            {user && (
+            {/* {user && (
               <DynamicPricingPanel
                 type="FLIGHT"
                 itemId={flight.id}
                 userId={user.id}
               />
-            )}
+            )} */}
 
             {/* Cancellation Policy */}
             <div className="bg-white rounded-xl shadow-sm p-6">

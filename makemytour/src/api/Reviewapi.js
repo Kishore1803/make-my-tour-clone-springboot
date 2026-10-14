@@ -1,11 +1,6 @@
 import axios from "axios";
 
-const API = axios.create({
-  baseURL: "https://make-my-tour-clone-springboot-backend.onrender.com/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+const API = axios.create({ baseURL: "https://make-my-tour-clone-springboot-backend.onrender.com/api" });
 
 // Create review
 export const createReview = (reviewData) => API.post("/reviews", reviewData);
@@ -13,10 +8,7 @@ export const createReview = (reviewData) => API.post("/reviews", reviewData);
 // Get reviews
 export const getReviews = (itemId, itemType, sort = "newest") =>
   API.get(`/reviews/item/${itemId}`, {
-    params: {
-      itemType,
-      sort,
-    },
+    params: { itemType, sort },
   });
 
 // Update review
@@ -33,20 +25,13 @@ export const markReviewHelpful = (reviewId) =>
 // Get rating summary
 export const getReviewSummary = (itemId, itemType) =>
   API.get("/reviews/summary", {
-    params: {
-      itemId,
-      itemType,
-    },
+    params: { itemId, itemType },
   });
 
 // Create reply
 export const createReviewReply = (reviewId, userId, comment) =>
   API.post("/review-replies", null, {
-    params: {
-      reviewId,
-      userId,
-      comment,
-    },
+    params: { reviewId, userId, comment },
   });
 
 // Get replies
@@ -56,18 +41,13 @@ export const getReviewReplies = (reviewId) =>
 // Update reply
 export const updateReviewReply = (replyId, userId, comment) =>
   API.put(`/review-replies/${replyId}`, null, {
-    params: {
-      userId,
-      comment,
-    },
+    params: { userId, comment },
   });
 
 // Delete reply
 export const deleteReviewReply = (replyId, userId) =>
   API.delete(`/review-replies/${replyId}`, {
-    params: {
-      userId,
-    },
+    params: { userId },
   });
 
 // Upload review photo
@@ -91,19 +71,13 @@ export const getReviewPhotos = (reviewId) =>
 // Delete review photo
 export const deleteReviewPhoto = (photoId, userId) =>
   API.delete(`/review-photos/${photoId}`, {
-    params: {
-      userId,
-    },
+    params: { userId },
   });
 
 // Report a review
 export const reportReview = (reviewId, userId, reason) =>
   API.post("/review-flags", null, {
-    params: {
-      reviewId,
-      userId,
-      reason,
-    },
+    params: { reviewId, userId, reason },
   });
 
 // Get pending reports

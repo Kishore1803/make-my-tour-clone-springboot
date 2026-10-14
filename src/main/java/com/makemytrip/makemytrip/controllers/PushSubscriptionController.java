@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/push")
-@CrossOrigin(origins = "http://localhost:3000")
 public class PushSubscriptionController {
 
 	@Autowired
@@ -23,11 +22,7 @@ public class PushSubscriptionController {
             return ResponseEntity.badRequest().body(Map.of("message", "Missing subscription details"));
         }
 
-        webPushService.saveSubscription(
-                request.getEndpoint(),
-                request.getP256dh(),
-                request.getAuth());
-
+        webPushService.saveSubscription(request.getEndpoint(), request.getP256dh(), request.getAuth());
         return ResponseEntity.ok(Map.of("message", "Push subscription saved"));
     }
 

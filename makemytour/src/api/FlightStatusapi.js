@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API = axios.create({
   baseURL:
-    "https://make-my-tour-clone-springboot-backend.onrender.com/api/flight-status",
+    "https://make-my-tour-clone-springboot-backend.onrender.comhttp://localhost:8081/api/flight-status",
 });
 
 export const getAllFlights = () => API.get("");
@@ -19,7 +19,7 @@ export const getFlightsByStatus = (status) =>
 export const createFlight = (flightData) => API.post("", flightData);
 
 const PUSH_API =
-  "https://make-my-tour-clone-springboot-backend.onrender.com/api/push";
+  "http://localhost:8081/api/push";
 
 export const savePushSubscription = (subscription) =>
   axios.post(`${PUSH_API}/subscribe`, {
