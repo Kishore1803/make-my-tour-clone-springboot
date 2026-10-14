@@ -33,7 +33,6 @@ import { useDispatch, useSelector } from "react-redux";
 
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
-import DynamicPricing from "@/components/Dynamic-Pricing/DynamicPricingPanel";
 import ReviewSection from "@/components/Review/ReviewSection";
 import DynamicPricingPanel from "@/components/Dynamic-Pricing/DynamicPricingPanel";
 

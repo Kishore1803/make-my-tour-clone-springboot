@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { freezePrice, getPriceFreeze } from "@/api/pricingApi";
+import { freezePrice, getPriceFreeze } from "@/api/PricingApi";
 import type { ItemType, PriceFreezeResponse } from "@/types/pricing";
 
 interface Props {
