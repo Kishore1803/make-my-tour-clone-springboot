@@ -26,18 +26,26 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
   const refresh = useCallback(async () => {
     try {
       const [current, records] = await Promise.all([
-        getCurrentPrice(type, itemId, userId as number | null),
+        getCurrentPrice(type, itemId, userId),
         getPriceHistory(type, itemId),
       ]);
 
       setPrice(current);
       setHistory(records);
       setError("");
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-          "Unable to refresh pricing information.",
-      );
+    } catch (err: unknown) {
+      const message =
+        typeof err === "object" && err !== null && "response" in err
+          ? (
+              err as {
+                response?: {
+                  data?: { message?: string };
+                };
+              }
+            ).response?.data?.message
+          : undefined;
+
+      setError(message || "Unable to refresh pricing information.");
     } finally {
       setLoading(false);
     }
@@ -47,9 +55,11 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
     let cancelled = false;
 
     const load = async () => {
+      setLoading(true);
+
       try {
         const [current, records] = await Promise.all([
-          getCurrentPrice(type, itemId, userId as number | null),
+          getCurrentPrice(type, itemId, userId),
           getPriceHistory(type, itemId),
         ]);
 
@@ -58,22 +68,34 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
           setHistory(records);
           setError("");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!cancelled) {
-          setError(
-            err?.response?.data?.message ||
-              "Unable to load pricing information.",
-          );
+          const message =
+            typeof err === "object" && err !== null && "response" in err
+              ? (
+                  err as {
+                    response?: {
+                      data?: { message?: string };
+                    };
+                  }
+                ).response?.data?.message
+              : undefined;
+
+          setError(message || "Unable to load pricing information.");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     void load();
 
     const timer = window.setInterval(() => {
-      if (!cancelled) void refresh();
+      if (!cancelled) {
+        void refresh();
+      }
     }, 30000);
 
     return () => {
@@ -82,7 +104,7 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
     };
   }, [type, itemId, userId, refresh]);
 
-  if (loading) {
+  if (loading && !price) {
     return (
       <div className="animate-pulse rounded-xl border bg-white p-6">
         <div className="h-6 w-40 rounded bg-gray-200" />
@@ -98,10 +120,11 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
         <p role="alert" className="text-sm text-red-700">
           {error || "Pricing information is unavailable."}
         </p>
+
         <button
           type="button"
           onClick={() => void refresh()}
-          className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-white"
+          className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
         >
           Try again
         </button>
@@ -116,9 +139,11 @@ export default function DynamicPricingPanel({ type, itemId, userId }: Props) {
           <p className="text-sm font-medium uppercase tracking-wider text-blue-600">
             MakeMyTour
           </p>
+
           <h2 className="mt-1 text-2xl font-bold text-gray-900">
             Dynamic pricing
           </h2>
+
           <p className="mt-1 text-sm text-gray-500">
             Transparent pricing, history and price protection.
           </p>

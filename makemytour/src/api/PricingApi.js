@@ -1,25 +1,25 @@
 import axios from "axios";
 
-const pricingApi = axios.create({
+const PricingApi = axios.create({
   baseURL: "https://make-my-tour-clone-springboot-backend.onrender.com",
 });
 
 export const getCurrentPrice = async (type, itemId, userId = null) => {
-  const response = await pricingApi.get(`/api/pricing/${type}/${itemId}`, {
+  const response = await PricingApi.get(`/api/pricing/${type}/${itemId}`, {
     params: userId != null ? { userId } : {},
   });
   return response.data;
 };
 
 export const getPriceHistory = async (type, itemId) => {
-  const response = await pricingApi.get(
+  const response = await PricingApi.get(
     `/api/pricing/${type}/${itemId}/history`,
   );
   return response.data;
 };
 
 export const freezePrice = async (type, itemId, userId) => {
-  const response = await pricingApi.post(
+  const response = await PricingApi.post(
     `/api/pricing/${type}/${itemId}/freeze`,
     { userId },
   );
@@ -27,16 +27,16 @@ export const freezePrice = async (type, itemId, userId) => {
 };
 
 export const getPriceFreeze = async (freezeId) => {
-  const response = await pricingApi.get(`/api/pricing/freezes/${freezeId}`);
+  const response = await PricingApi.get(`/api/pricing/freezes/${freezeId}`);
   return response.data;
 };
 
 export const updatePricing = async (type, itemId, pricing) => {
-  const response = await pricingApi.put(
+  const response = await PricingApi.put(
     `/api/pricing/admin/${type}/${itemId}`,
     pricing,
   );
   return response.data;
 };
 
-export default pricingApi;
+export default PricingApi;
