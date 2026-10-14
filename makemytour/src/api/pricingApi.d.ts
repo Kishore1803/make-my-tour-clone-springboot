@@ -1,36 +1,35 @@
-import type {
-  ItemType,
-  PriceResponse,
-  PriceHistoryPoint,
-  PriceFreezeResponse,
-  PricingUpdateRequest,
-} from "@/types/pricing";
+import type { AxiosInstance } from "axios";
 
 export function getCurrentPrice(
-  type: ItemType,
+  type: "FLIGHT" | "HOTEL",
   itemId: number,
   userId?: number | null,
-): Promise<PriceResponse>;
+): Promise<any>;
 
 export function getPriceHistory(
-  type: ItemType,
+  type: "FLIGHT" | "HOTEL",
   itemId: number,
-): Promise<PriceHistoryPoint[]>;
+): Promise<any[]>;
 
 export function freezePrice(
-  type: ItemType,
+  type: "FLIGHT" | "HOTEL",
   itemId: number,
   userId: number,
-): Promise<PriceFreezeResponse>;
+): Promise<any>;
 
-export function getPriceFreeze(freezeId: number): Promise<PriceFreezeResponse>;
+export function getPriceFreeze(freezeId: number): Promise<any>;
 
 export function updatePricing(
-  type: ItemType,
+  type: "FLIGHT" | "HOTEL",
   itemId: number,
-  pricing: PricingUpdateRequest,
-): Promise<PriceResponse>;
+  pricing: {
+    basePrice: number;
+    demandAdjustment: number;
+    seasonalAdjustment: number;
+    holiday: boolean;
+  },
+): Promise<any>;
 
-declare const pricingApi: import("axios").AxiosInstance;
+declare const pricingApi: AxiosInstance;
 
 export default pricingApi;
