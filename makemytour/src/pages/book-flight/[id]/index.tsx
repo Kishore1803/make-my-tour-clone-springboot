@@ -14,8 +14,10 @@ import {
   Ticket,
 } from "lucide-react";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+
 import { getflight, handleflightbooking } from "@/api";
 import { useDispatch, useSelector } from "react-redux";
+
 import {
   Dialog,
   DialogContent,
@@ -23,10 +25,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setUser } from "@/store";
+
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
 import FlightSeatMap from "@/components/SeatRoom/FlightSeatMap";
@@ -38,7 +42,7 @@ interface Flight {
   flightName: string;
   from: string;
   to: string;
-  departureDate?: string;
+  departureDate: string;
   departureTime: string;
   arrivalTime: string;
   price: number;
@@ -65,28 +69,43 @@ interface PromoOffer {
   amount: number;
 }
 
+// Map both Java camelCase JSON and database-style snake_case JSON.
 const normalizeFlight = (raw: any): Flight => ({
   id: Number(raw.id),
   flightName: raw.flightName ?? raw.flight_name ?? "",
   from: raw.from ?? raw.departureCity ?? raw.departure_city ?? "",
   to: raw.to ?? raw.arrivalCity ?? raw.arrival_city ?? "",
-  departureDate: raw.departureDate ?? raw.departure_date ?? "",
-  departureTime: raw.departureTime ?? raw.departure_time ?? "",
-  arrivalTime: raw.arrivalTime ?? raw.arrival_time ?? "",
+  departureDate: String(
+    raw.departureDate ?? raw.departure_date ?? raw.departuredate ?? "",
+  ).trim(),
+  departureTime: String(raw.departureTime ?? raw.departure_time ?? "").trim(),
+  arrivalTime: String(raw.arrivalTime ?? raw.arrival_time ?? "").trim(),
   price: Number(raw.price ?? 0),
   availableSeats: Number(raw.availableSeats ?? raw.available_seats ?? 0),
 });
 
-// Handles date-only strings, ISO date-time strings, and common time formats.
-const formatDate = (dateString?: string): string => {
-  if (!dateString) return "Date unavailable";
+// Format date without accidentally shifting YYYY-MM-DD due to timezone.
+const formatDate = (value?: string): string => {
+  if (!value) return "Date not set";
 
-  const value = String(dateString).trim();
-  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const input = String(value).trim();
+
+  const dateOnly = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
   if (dateOnly) {
-    const [, year, month, day] = dateOnly;
-    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    const year = Number(dateOnly[1]);
+    const month = Number(dateOnly[2]);
+    const day = Number(dateOnly[3]);
+
+    const date = new Date(year, month - 1, day);
+
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return "Date not set";
+    }
 
     return date.toLocaleDateString("en-IN", {
       day: "2-digit",
@@ -95,29 +114,28 @@ const formatDate = (dateString?: string): string => {
     });
   }
 
-  const parsed = new Date(value);
+  const parsed = new Date(input);
 
   if (Number.isNaN(parsed.getTime())) {
-    return value;
+    return input;
   }
 
-  return parsed.toLocaleString("en-IN", {
+  return parsed.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 };
 
+// Accepts 06:00 AM, 18:00:00, or a complete ISO datetime.
 const parseTime = (value?: string): number | null => {
   if (!value) return null;
 
   const input = value.trim();
 
-  // ISO date-time value
   if (input.includes("T")) {
     const date = new Date(input);
+
     if (!Number.isNaN(date.getTime())) {
       return date.getHours() * 60 + date.getMinutes();
     }
@@ -142,22 +160,21 @@ const parseTime = (value?: string): number | null => {
 };
 
 const formatTime = (value?: string): string => {
-  if (!value) return "Time unavailable";
+  if (!value) return "Time not set";
 
   const minutes = parseTime(value);
 
-  if (minutes === null) {
-    // Return original value rather than showing "Invalid Date".
-    return value;
-  }
+  // If the backend uses another format, show its original value.
+  if (minutes === null) return value;
 
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
+  const period = hours >= 12 ? "PM" : "AM";
 
   return `${String(hours % 12 || 12).padStart(2, "0")}:${String(mins).padStart(
     2,
     "0",
-  )} ${hours >= 12 ? "PM" : "AM"}`;
+  )} ${period}`;
 };
 
 const getFlightDuration = (
@@ -173,13 +190,13 @@ const getFlightDuration = (
 
   let difference = arrival - departure;
 
-  // Arrival may be on the following day.
+  // Arrival may be after midnight.
   if (difference < 0) difference += 24 * 60;
+
+  if (difference === 0) return "Duration unavailable";
 
   const hours = Math.floor(difference / 60);
   const minutes = difference % 60;
-
-  if (difference === 0) return "Duration unavailable";
 
   return `${hours}h ${minutes}m`;
 };
@@ -196,6 +213,7 @@ const BookFlightPage = () => {
   const [booking, setBooking] = useState(false);
 
   const user = useSelector((state: any) => state.user.user) as User | null;
+
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -207,18 +225,35 @@ const BookFlightPage = () => {
       try {
         setLoading(true);
 
-        const data = await getflight();
-        const list = Array.isArray(data) ? data.map(normalizeFlight) : [];
+        const response = await getflight();
+
+        console.log("Flight API response:", response);
+
+        const rawFlights = Array.isArray(response) ? response : [];
+
+        const allFlights = rawFlights.map(normalizeFlight);
+
+        console.log("Normalized flights:", allFlights);
+
         const flightId = Number(Array.isArray(id) ? id[0] : id);
 
+        const matchedFlights = allFlights.filter(
+          (flight) => flight.id === flightId,
+        );
+
         if (!cancelled) {
-          setFlights(list.filter((flight) => flight.id === flightId));
+          setFlights(matchedFlights);
         }
       } catch (error) {
         console.error("Error fetching flights:", error);
-        if (!cancelled) setFlights([]);
+
+        if (!cancelled) {
+          setFlights([]);
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
@@ -229,17 +264,22 @@ const BookFlightPage = () => {
     };
   }, [router.isReady, id]);
 
-  if (loading) return <Loader />;
+  if (loading) {
+    return <Loader />;
+  }
 
   if (flights.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fa] px-4">
         <div className="rounded-xl bg-white p-8 text-center shadow-sm">
           <Plane className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+
           <h2 className="text-xl font-bold text-gray-800">No Flight Found</h2>
+
           <p className="mt-2 text-gray-500">
             No flight data is available for this flight ID.
           </p>
+
           <Button className="mt-5" onClick={() => router.back()}>
             Go Back
           </Button>
@@ -249,6 +289,7 @@ const BookFlightPage = () => {
   }
 
   const flight = flights[0];
+
   const duration = getFlightDuration(flight.departureTime, flight.arrivalTime);
 
   const taxesPerTicket = Math.round(flight.price * 0.18);
@@ -259,6 +300,7 @@ const BookFlightPage = () => {
   const totalTaxes = taxesPerTicket * quantity;
   const totalOtherServices = otherServicesPerTicket * quantity;
   const totalDiscounts = discountPerTicket * quantity;
+
   const grandTotal =
     totalPrice + totalTaxes + totalOtherServices - totalDiscounts;
 
@@ -322,6 +364,7 @@ const BookFlightPage = () => {
     }
 
     const maxSeats = Math.max(1, flight.availableSeats || 1);
+
     setQuantity(Math.max(1, Math.min(value, maxSeats)));
   };
 
@@ -441,6 +484,7 @@ const BookFlightPage = () => {
               value={quantity}
               onChange={handleQuantityChange}
             />
+
             <p className="text-xs text-gray-500">
               {flight.availableSeats} seats available
             </p>
@@ -463,10 +507,12 @@ const BookFlightPage = () => {
             <FareRow label="Base Fare" value={totalPrice} />
             <FareRow label="Taxes and Surcharges" value={totalTaxes} />
             <FareRow label="Other Services" value={totalOtherServices} />
+
             <div className="flex justify-between text-green-600">
               <span>Discounts</span>
               <span>- ₹ {totalDiscounts.toLocaleString("en-IN")}</span>
             </div>
+
             <div className="mt-2 flex justify-between border-t pt-3 text-lg font-bold">
               <span>Total Amount</span>
               <span>₹ {grandTotal.toLocaleString("en-IN")}</span>
@@ -514,12 +560,14 @@ const BookFlightPage = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
                   <Plane className="h-6 w-6 text-blue-600" />
                 </div>
+
                 <div>
                   <div className="font-semibold">{flight.flightName}</div>
                   <div className="text-sm text-gray-600">
                     {flightDetails.flightNo} • {flightDetails.aircraft}
                   </div>
                 </div>
+
                 <div className="ml-auto text-sm">
                   <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-600">
                     Economy
@@ -571,6 +619,7 @@ const BookFlightPage = () => {
               </div>
             </section>
 
+            {/* Dynamic pricing */}
             {user && (
               <DynamicPricingPanel
                 type="FLIGHT"
@@ -597,6 +646,7 @@ const BookFlightPage = () => {
                 </div>
 
                 <div className="h-2.5 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+
                 <div className="mt-2 flex justify-between text-xs text-gray-600">
                   <span>Now</span>
                   <span>{formatDate(flight.departureDate)}</span>
@@ -620,6 +670,7 @@ const BookFlightPage = () => {
                   <Gift className="mr-2 h-5 w-5 text-red-500" />
                   Book a Flight & unlock these offers
                 </h2>
+
                 <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600">
                   Flyer Exclusive Deal
                 </span>
@@ -646,6 +697,7 @@ const BookFlightPage = () => {
                       <h3 className="mb-1 text-lg font-semibold">
                         {hotel.name}
                       </h3>
+
                       <div className="mb-2 flex items-center text-sm text-gray-600">
                         <MapPin className="mr-1 h-4 w-4" />
                         {hotel.location}
@@ -653,10 +705,16 @@ const BookFlightPage = () => {
 
                       <div className="flex items-center justify-between">
                         <div className="flex text-yellow-400">
-                          {Array.from({ length: hotel.rating }).map((_, i) => (
-                            <Star key={i} className="h-4 w-4 fill-current" />
-                          ))}
+                          {Array.from({ length: hotel.rating }).map(
+                            (_, index) => (
+                              <Star
+                                key={index}
+                                className="h-4 w-4 fill-current"
+                              />
+                            ),
+                          )}
                         </div>
+
                         <div className="text-right">
                           <div className="text-xs text-gray-500">
                             Starting from
@@ -711,9 +769,11 @@ const BookFlightPage = () => {
                     <DialogHeader>
                       <DialogTitle>Login Required</DialogTitle>
                     </DialogHeader>
+
                     <p className="text-gray-600">
                       Please log in to continue with your booking.
                     </p>
+
                     <SignupDialog
                       trigger={
                         <Button className="w-full">Log In / Sign Up</Button>
@@ -747,13 +807,16 @@ const BookFlightPage = () => {
                         name="promo"
                         className="mt-1.5 h-4 w-4 accent-red-600"
                       />
+
                       <div>
                         <div className="font-semibold text-red-600">
                           {offer.code}
                         </div>
+
                         <p className="mt-1 text-sm text-gray-600">
                           {offer.description}
                         </p>
+
                         <button
                           type="button"
                           className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
