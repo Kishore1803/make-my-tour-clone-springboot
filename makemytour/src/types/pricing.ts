@@ -15,6 +15,7 @@ export interface PriceResponse {
 export interface PriceHistoryPoint {
   basePrice: number;
   finalPrice: number;
+  changePercentage?: number;
   recordedAt: string;
 }
 

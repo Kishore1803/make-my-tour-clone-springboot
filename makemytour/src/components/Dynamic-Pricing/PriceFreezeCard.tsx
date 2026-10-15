@@ -1,144 +1,82 @@
 import { useEffect, useState } from "react";
-import { freezePrice, getPriceFreeze } from "@/api/PricingApi";
-import type { ItemType, PriceFreezeResponse } from "@/types/pricing";
+import type { PriceFreezeResponse } from "../../types/pricing";
 
-interface Props {
-  type: ItemType;
-  itemId: number;
-  userId: number;
-  onFrozen: () => void;
+function remaining(expiresAt: string) {
+  const s = Math.max(
+    0,
+    Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000),
+  );
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
-const money = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(value);
-
 export default function PriceFreezeCard({
-  type,
-  itemId,
   userId,
-  onFrozen,
-}: Props) {
-  const [freeze, setFreeze] = useState<PriceFreezeResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [remaining, setRemaining] = useState("");
-
+  onFreeze,
+}: {
+  userId: number | string;
+  onFreeze: () => Promise<PriceFreezeResponse>;
+}) {
+  const [freeze, setFreeze] = useState<PriceFreezeResponse | null>(null),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (!freeze || freeze.status !== "ACTIVE") return;
-    let cancelled = false;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
-    const checkStatus = async () => {
-      try {
-        const data = await getPriceFreeze(freeze.freezeId);
-        if (!cancelled) setFreeze(data);
-      } catch {
-        // Keep last known status during a temporary network error.
-      }
-    };
-
-    const timer = window.setInterval(() => void checkStatus(), 15000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [freeze?.freezeId, freeze?.status]);
-
-  useEffect(() => {
-    if (!freeze || freeze.status !== "ACTIVE") {
-      setRemaining("");
-      return;
-    }
-
-    const updateCountdown = () => {
-      const ms = new Date(freeze.expiresAt).getTime() - Date.now();
-
-      if (ms <= 0) {
-        setRemaining("Checking expiry...");
-        return;
-      }
-
-      const seconds = Math.floor(ms / 1000);
-
-      setRemaining(
-        `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(
-          2,
-          "0",
-        )}s remaining`,
-      );
-    };
-
-    updateCountdown();
-
-    const timer = window.setInterval(updateCountdown, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [freeze?.expiresAt, freeze?.status]);
-
-  const handleFreeze = async () => {
-    setLoading(true);
+  const active = !!freeze &&
+    freeze.status === "ACTIVE" &&
+    new Date(freeze.expiresAt).getTime() > now;
+  async function submit() {
+    setBusy(true);
     setError("");
-
     try {
-      const data = await freezePrice(type, itemId, userId);
-      setFreeze(data);
-      onFrozen();
-    } catch (err: any) {
+      setFreeze(await onFreeze());
+    } catch (e: any) {
       setError(
-        err?.response?.data?.message || "Unable to freeze price. Try again.",
+        e?.response?.data?.message || e?.message || "Unable to freeze price",
       );
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
-  const isActive =
-    freeze?.status === "ACTIVE" &&
-    new Date(freeze.expiresAt).getTime() > Date.now();
+  }
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-bold text-gray-900">🔒 Freeze your price</h3>
-      <p className="mt-1 text-sm text-gray-500">
-        Lock the current quote for 30 minutes.
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="font-semibold">🔒 Freeze this price</h3>
+      <p className="mt-1 text-sm text-slate-500">
+        Lock the current quote for 30 minutes while you decide.
       </p>
 
-      {isActive && freeze ? (
-        <div className="mt-4 rounded-xl bg-green-50 p-4">
-          <p className="font-semibold text-green-800">Price freeze active</p>
-          <p className="mt-2 text-2xl font-bold text-green-900">
-            {money(freeze.lockedPrice)}
-          </p>
-          <p className="mt-2 text-sm text-green-800">{remaining}</p>
-          <p className="mt-1 text-xs text-green-800">
-            Expires: {new Date(freeze.expiresAt).toLocaleString("en-IN")}
+      {active ? (
+        <div className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+          Price locked · Time remaining: <b>{remaining(freeze!.expiresAt)}</b>
+          <p className="mt-1">
+            Locked price: ₹{Number(freeze!.lockedPrice).toLocaleString("en-IN")}
           </p>
         </div>
       ) : (
         <button
           type="button"
-          onClick={() => void handleFreeze()}
-          disabled={loading || userId <= 0}
-          className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+          onClick={submit}
+          disabled={busy || !userId}
+          className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? "Freezing price..." : "Freeze current price"}
+          {busy ? "Locking price…" : "Freeze price for 30 minutes"}
         </button>
       )}
 
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-600">
+        <p role="alert" className="mt-3 text-sm text-rose-600">
           {error}
         </p>
       )}
-
-      <p className="mt-4 text-xs text-gray-500">
-        A freeze does not book the ticket or room. Checkout must validate the
-        freeze on the backend.
-      </p>
+      {!userId && (
+        <p className="mt-2 text-xs text-slate-500">
+          Sign in to freeze a price.
+        </p>
+      )}
     </section>
   );
 }

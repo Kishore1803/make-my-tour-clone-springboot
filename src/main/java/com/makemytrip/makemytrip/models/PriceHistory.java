@@ -5,14 +5,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-    name = "price_history",
-    indexes = {
-        @Index(
-            name = "idx_price_history_item",
-            columnList = "item_type,item_id,recorded_at"
-        )
-    }
+@Table(name = "price_history",
+    indexes = @Index(name = "idx_price_history_item",
+        columnList = "item_type,item_id,recorded_at"
+    )
 )
 public class PriceHistory {
 
@@ -20,67 +16,102 @@ public class PriceHistory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "item_type", nullable = false, length = 16)
+    @Column(name = "item_type", length = 255)
     private String itemType;
 
-    @Column(name = "item_id", nullable = false)
+    @Column(name = "item_id")
     private Long itemId;
 
-    @Column(name = "base_price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "dynamic_price")
+    private BigDecimal dynamicPrice;
+
+    @Column(name = "base_price", precision = 12, scale = 2)
     private BigDecimal basePrice;
 
-    @Column(name = "final_price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "final_price", precision = 12, scale = 2)
     private BigDecimal finalPrice;
 
-    @Column(name = "change_percentage", nullable = false, precision = 7, scale = 2)
+    @Column(name = "change_percentage", precision = 7, scale = 2)
     private BigDecimal changePercentage = BigDecimal.ZERO;
 
-    @Column(name = "recorded_at", nullable = false)
+    @Column(name = "demand_adjustment", precision = 6, scale = 4)
+    private BigDecimal demandAdjustment;
+
+    @Column(name = "seasonal_adjustment", precision = 6, scale = 4)
+    private BigDecimal seasonalAdjustment;
+
+    @Column(name = "holiday")
+    private Boolean holiday = false;
+
+    @Column(name = "flight_id")
+    private Long flightId;
+
+    @Column(name = "hotel_id")
+    private Long hotelId;
+
+    @Column(name = "reason")
+    private String reason;
+
+    @Column(name = "recorded_at")
     private LocalDateTime recordedAt;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void onCreate() {
-        if (recordedAt == null) {
-            recordedAt = LocalDateTime.now();
-        }
+        LocalDateTime now = LocalDateTime.now();
 
+        if (recordedAt == null) recordedAt = now;
+        if (createdAt == null) createdAt = now;
         if (changePercentage == null) {
             changePercentage = BigDecimal.ZERO;
         }
+        if (holiday == null) {
+            holiday = false;
+        }
     }
 
-    public Long getId() {
-        return id;
+    public Long getId() { 
+    	return id;
     }
 
-    public String getItemType() {
-        return itemType;
+    public String getItemType() { 
+    	return itemType; 
+    }
+    
+    public void setItemType(String itemType) { 
+    	this.itemType = itemType;
     }
 
-    public void setItemType(String itemType) {
-        this.itemType = itemType;
+    public Long getItemId() { 
+    	return itemId;
+    }
+    
+    public void setItemId(Long itemId) { 
+    	this.itemId = itemId;
     }
 
-    public Long getItemId() {
-        return itemId;
+    public BigDecimal getDynamicPrice() { 
+    	return dynamicPrice;
+    }
+    
+    public void setDynamicPrice(BigDecimal dynamicPrice) {
+        this.dynamicPrice = dynamicPrice;
     }
 
-    public void setItemId(Long itemId) {
-        this.itemId = itemId;
+    public BigDecimal getBasePrice() { 
+    	return basePrice;
     }
-
-    public BigDecimal getBasePrice() {
-        return basePrice;
-    }
-
+    
     public void setBasePrice(BigDecimal basePrice) {
         this.basePrice = basePrice;
     }
 
-    public BigDecimal getFinalPrice() {
-        return finalPrice;
+    public BigDecimal getFinalPrice() { 
+    	return finalPrice; 
     }
-
+    
     public void setFinalPrice(BigDecimal finalPrice) {
         this.finalPrice = finalPrice;
     }
@@ -88,16 +119,68 @@ public class PriceHistory {
     public BigDecimal getChangePercentage() {
         return changePercentage;
     }
-
+    
     public void setChangePercentage(BigDecimal changePercentage) {
         this.changePercentage = changePercentage;
     }
 
-    public LocalDateTime getRecordedAt() {
-        return recordedAt;
+    public BigDecimal getDemandAdjustment() {
+        return demandAdjustment;
+    }
+    
+    public void setDemandAdjustment(BigDecimal demandAdjustment) {
+        this.demandAdjustment = demandAdjustment;
     }
 
+    public BigDecimal getSeasonalAdjustment() {
+        return seasonalAdjustment;
+    }
+    
+    public void setSeasonalAdjustment(BigDecimal seasonalAdjustment) {
+        this.seasonalAdjustment = seasonalAdjustment;
+    }
+
+    public Boolean getHoliday() { 
+    	return holiday;
+    }
+    
+    public void setHoliday(Boolean holiday) {
+        this.holiday = holiday;
+    }
+
+    public Long getFlightId() { 
+    	return flightId; 
+    }
+    
+    public void setFlightId(Long flightId) {
+        this.flightId = flightId;
+    }
+
+    public Long getHotelId() { 
+    	return hotelId;
+    }
+    
+    public void setHotelId(Long hotelId) {
+        this.hotelId = hotelId;
+    }
+
+    public String getReason() { 
+    	return reason;
+    }
+    
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    public LocalDateTime getRecordedAt() { 
+    	return recordedAt;
+    }
+    
     public void setRecordedAt(LocalDateTime recordedAt) {
         this.recordedAt = recordedAt;
+    }
+
+    public LocalDateTime getCreatedAt() { 
+    	return createdAt;
     }
 }

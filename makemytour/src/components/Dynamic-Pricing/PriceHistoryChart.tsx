@@ -1,126 +1,114 @@
-import type { PriceHistoryPoint } from "@/types/pricing";
+import type { PriceHistoryPoint } from "../../types/pricing";
 
-interface Props {
-  history: PriceHistoryPoint[];
-}
-
-const money = (value: number) =>
+const money = (n: number) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(value);
+  }).format(n);
 
-export default function PriceHistoryChart({ history }: Props) {
+export default function PriceHistoryChart({
+  history,
+}: {
+  history: PriceHistoryPoint[];
+}) {
+  
   const points = [...history]
-    .filter((item) => Number.isFinite(Number(item.finalPrice)))
+    .filter((p) => Number.isFinite(Number(p.finalPrice)))
     .sort(
       (a, b) =>
         new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
     )
     .slice(-30);
 
-  if (points.length === 0) {
+  if (points.length < 2)
     return (
-      <section className="rounded-2xl border bg-white p-5">
-        <h3 className="text-lg font-bold">Price history</h3>
-        <p className="mt-2 text-sm text-gray-500">
-          No price history available yet.
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 className="font-semibold">Price history</h3>
+        <p className="mt-2 text-sm text-slate-500">
+          History graph appears after at least two price snapshots are saved by
+          the backend.
         </p>
       </section>
     );
-  }
 
-  const width = 600;
-  const height = 240;
-  const padding = 35;
-  const values = points.map((p) => Number(p.finalPrice));
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const coordinates = points.map((point, index) => ({
-    x:
-      points.length === 1
-        ? width / 2
-        : padding + (index / (points.length - 1)) * (width - padding * 2),
-    y:
-      height -
-      padding -
-      ((Number(point.finalPrice) - min) / range) * (height - padding * 2),
+  const values = points.map((p) => Number(p.finalPrice)),
+    min = Math.min(...values),
+    max = Math.max(...values),
+    range = Math.max(max - min, 1),
+    w = 640,
+    h = 190,
+    pad = 18;
+  const coords = values.map((v, i) => ({
+    x: pad + (i * (w - 2 * pad)) / (values.length - 1),
+    y: h - pad - ((v - min) / range) * (h - 2 * pad),
   }));
-  const path = coordinates
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-bold text-gray-900">Price history</h3>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex justify-between gap-3">
+        <h3 className="font-semibold">Price history</h3>
+        <span className="text-xs text-slate-500">
+          {points.length} snapshots
+        </span>
+      </div>
 
-      <p className="mt-1 text-sm text-gray-500">
-        Last {points.length} recorded prices
-      </p>
-
-      <div className="mt-4 overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full min-w-[400px]"
-          role="img"
-          aria-label="Booking price history chart"
-        >
-          {[0, 1, 2, 3].map((n) => {
-            const y = padding + (n / 3) * (height - padding * 2);
-
-            return (
-              <line
-                key={n}
-                x1={padding}
-                x2={width - padding}
-                y1={y}
-                y2={y}
-                stroke="#e5e7eb"
-                strokeDasharray="4 4"
-              />
-            );
-          })}
-
-          <path
-            d={path}
-            fill="none"
-            stroke="#2563eb"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        role="img"
+        aria-label="Booking price history chart"
+        className="mt-4 h-auto w-full"
+      >
+        {[0, 0.5, 1].map((f) => (
+          <line
+            key={f}
+            x1={pad}
+            x2={w - pad}
+            y1={pad + f * (h - 2 * pad)}
+            y2={pad + f * (h - 2 * pad)}
+            stroke="#e2e8f0"
+            strokeDasharray="4 4"
           />
+        ))}
 
-          {coordinates.map((point, index) => (
-            <circle
-              key={`${points[index].recordedAt}-${index}`}
-              cx={point.x}
-              cy={point.y}
-              r="4"
-              fill="#2563eb"
+        <polyline
+          points={coords.map((p) => `${p.x},${p.y}`).join(" ")}
+          fill="none"
+          stroke="#2563eb"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {coords.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r="4" fill="#2563eb">
+            <title>
+              {money(values[i])} —{" "}
+              {new Date(points[i].recordedAt).toLocaleString()}
+            </title>
+          </circle>
+        ))}
+      </svg>
+
+      <div className="flex justify-between text-xs text-slate-500">
+        <span>Low: {money(min)}</span>
+        <span>High: {money(max)}</span>
+      </div>
+      <div className="mt-4 max-h-36 space-y-2 overflow-y-auto">
+        {[...points]
+          .reverse()
+          .slice(0, 5)
+          .map((p, i) => (
+            <div
+              key={`${p.recordedAt}-${i}`}
+              className="flex justify-between gap-3 text-xs"
             >
-              <title>
-                {new Date(points[index].recordedAt).toLocaleString("en-IN")} —{" "}
-                {money(Number(points[index].finalPrice))}
-              </title>
-            </circle>
+              <span className="text-slate-500">
+                {new Date(p.recordedAt).toLocaleString()}
+              </span>
+              <b>{money(Number(p.finalPrice))}</b>
+            </div>
           ))}
-        </svg>
       </div>
-
-      <div className="mt-3 flex justify-between text-sm text-gray-600">
-        <span>
-          Lowest: <b>{money(min)}</b>
-        </span>
-        <span>
-          Highest: <b>{money(max)}</b>
-        </span>
-      </div>
-
-      <p className="mt-3 text-xs text-gray-500">
-        Historical values are recorded prices, not future predictions.
-      </p>
     </section>
   );
 }
