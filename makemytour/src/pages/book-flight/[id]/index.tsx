@@ -9,13 +9,18 @@ import {
   CreditCard,
   AlertCircle,
   Star,
-  Info,
   ArrowRight,
-  Ticket,
 } from "lucide-react";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 import { getflight, handleflightbooking } from "@/api";
+import { freezePrice } from "@/api/PricingApi";
 import { useDispatch, useSelector } from "react-redux";
 
 import {
@@ -69,7 +74,6 @@ interface PromoOffer {
   amount: number;
 }
 
-// Map both Java camelCase JSON and database-style snake_case JSON.
 const normalizeFlight = (raw: any): Flight => ({
   id: Number(raw.id),
   flightName: raw.flightName ?? raw.flight_name ?? "",
@@ -84,18 +88,16 @@ const normalizeFlight = (raw: any): Flight => ({
   availableSeats: Number(raw.availableSeats ?? raw.available_seats ?? 0),
 });
 
-// Format date without accidentally shifting YYYY-MM-DD due to timezone.
 const formatDate = (value?: string): string => {
   if (!value) return "Date not set";
 
   const input = String(value).trim();
+  const match = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
-  const dateOnly = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-
-  if (dateOnly) {
-    const year = Number(dateOnly[1]);
-    const month = Number(dateOnly[2]);
-    const day = Number(dateOnly[3]);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
 
     const date = new Date(year, month - 1, day);
 
@@ -116,9 +118,7 @@ const formatDate = (value?: string): string => {
 
   const parsed = new Date(input);
 
-  if (Number.isNaN(parsed.getTime())) {
-    return input;
-  }
+  if (Number.isNaN(parsed.getTime())) return input;
 
   return parsed.toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -127,7 +127,6 @@ const formatDate = (value?: string): string => {
   });
 };
 
-// Accepts 06:00 AM, 18:00:00, or a complete ISO datetime.
 const parseTime = (value?: string): number | null => {
   if (!value) return null;
 
@@ -153,7 +152,6 @@ const parseTime = (value?: string): number | null => {
 
   if (period === "PM" && hours < 12) hours += 12;
   if (period === "AM" && hours === 12) hours = 0;
-
   if (hours > 23) return null;
 
   return hours * 60 + minutes;
@@ -163,8 +161,6 @@ const formatTime = (value?: string): string => {
   if (!value) return "Time not set";
 
   const minutes = parseTime(value);
-
-  // If the backend uses another format, show its original value.
   if (minutes === null) return value;
 
   const hours = Math.floor(minutes / 60);
@@ -190,96 +186,84 @@ const getFlightDuration = (
 
   let difference = arrival - departure;
 
-  // Arrival may be after midnight.
   if (difference < 0) difference += 24 * 60;
-
   if (difference === 0) return "Duration unavailable";
 
-  const hours = Math.floor(difference / 60);
-  const minutes = difference % 60;
-
-  return `${hours}h ${minutes}m`;
+  return `${Math.floor(difference / 60)}h ${difference % 60}m`;
 };
 
 const BookFlightPage = () => {
   const router = useRouter();
   const { id } = router.query;
+  const dispatch = useDispatch();
 
-  const [flights, setFlights] = useState<Flight[]>([]);
+  const user = useSelector((state: any) => state.user.user) as User | null
+  const [flight, setFlight] = useState<Flight | null>(null);
   const [loading, setLoading] = useState(true);
-  const [quantity, setQuantity] = useState(1);
   const [selectedSeat, setSelectedSeat] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
   const [booking, setBooking] = useState(false);
+  const [error, setError] = useState("");
+  const [lockedPrice, setLockedPrice] = useState<number | null>(null);
+  const [freezeExpiresAt, setFreezeExpiresAt] = useState<string | null>(null);
 
-  const user = useSelector((state: any) => state.user.user) as User | null;
+  const flightId = Number(Array.isArray(id) ? id[0] : id);
 
-  const dispatch = useDispatch();
-
-  useEffect(() => {
+  const fetchFlight = useCallback(async () => {
     if (!router.isReady || !id) return;
 
-    let cancelled = false;
+    if (!Number.isFinite(flightId) || flightId <= 0) {
+      setError("Invalid flight ID.");
+      setLoading(false);
+      return;
+    }
 
-    const fetchFlights = async () => {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
+      setError("");
 
-        const response = await getflight();
+      const response = await getflight();
+      const list = Array.isArray(response) ? response : [];
 
-        console.log("Flight API response:", response);
+      const found = list
+        .map(normalizeFlight)
+        .find((item) => item.id === flightId);
 
-        const rawFlights = Array.isArray(response) ? response : [];
+      setFlight(found ?? null);
 
-        const allFlights = rawFlights.map(normalizeFlight);
-
-        console.log("Normalized flights:", allFlights);
-
-        const flightId = Number(Array.isArray(id) ? id[0] : id);
-
-        const matchedFlights = allFlights.filter(
-          (flight) => flight.id === flightId,
-        );
-
-        if (!cancelled) {
-          setFlights(matchedFlights);
-        }
-      } catch (error) {
-        console.error("Error fetching flights:", error);
-
-        if (!cancelled) {
-          setFlights([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (!found) {
+        setError("No flight data is available for this flight ID.");
       }
-    };
+    } catch (e: any) {
+      console.error("Error fetching flights:", e);
 
-    fetchFlights();
+      setFlight(null);
+      setError(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Unable to load flights.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [router.isReady, id, flightId]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [router.isReady, id]);
+  useEffect(() => {
+    void fetchFlight();
+  }, [fetchFlight]);
 
-  if (loading) {
-    return <Loader />;
-  }
+  if (loading) return <Loader />;
 
-  if (flights.length === 0) {
+  if (!flight) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fa] px-4">
         <div className="rounded-xl bg-white p-8 text-center shadow-sm">
           <Plane className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-
           <h2 className="text-xl font-bold text-gray-800">No Flight Found</h2>
-
           <p className="mt-2 text-gray-500">
-            No flight data is available for this flight ID.
+            {error || "No flight data is available."}
           </p>
-
           <Button className="mt-5" onClick={() => router.back()}>
             Go Back
           </Button>
@@ -288,18 +272,19 @@ const BookFlightPage = () => {
     );
   }
 
-  const flight = flights[0];
-
   const duration = getFlightDuration(flight.departureTime, flight.arrivalTime);
+
+  // This page books one selected seat per request.
+  const quantity = 1;
 
   const taxesPerTicket = Math.round(flight.price * 0.18);
   const otherServicesPerTicket = 249;
   const discountPerTicket = 250;
 
-  const totalPrice = flight.price * quantity;
-  const totalTaxes = taxesPerTicket * quantity;
-  const totalOtherServices = otherServicesPerTicket * quantity;
-  const totalDiscounts = discountPerTicket * quantity;
+  const totalPrice = flight.price;
+  const totalTaxes = taxesPerTicket;
+  const totalOtherServices = otherServicesPerTicket;
+  const totalDiscounts = discountPerTicket;
 
   const grandTotal =
     totalPrice + totalTaxes + totalOtherServices - totalDiscounts;
@@ -355,46 +340,86 @@ const BookFlightPage = () => {
     },
   ];
 
-  const handleQuantityChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const value = Number.parseInt(event.target.value, 10);
-
-    if (Number.isNaN(value)) {
-      setQuantity(1);
-      return;
+  // Freeze the price using the existing PricingApi.js function.
+  const handleFreezePrice = async () => {
+    if (!user?.id) {
+      throw new Error("Please log in to freeze the price.");
     }
 
-    const maxSeats = Math.max(1, flight.availableSeats || 1);
+    const response = await freezePrice("FLIGHT", flight.id, user.id);
 
-    setQuantity(Math.max(1, Math.min(value, maxSeats)));
+    const value = Number(response?.lockedPrice ?? response?.price);
+
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error("The freeze API did not return a valid lockedPrice.");
+    }
+
+    if (response?.status && response.status !== "ACTIVE") {
+      throw new Error("The returned price freeze is not active.");
+    }
+
+    if (response?.expiresAt) {
+      const expiry = new Date(response.expiresAt).getTime();
+
+      if (!Number.isFinite(expiry) || expiry <= Date.now()) {
+        throw new Error("The frozen price has expired.");
+      }
+
+      setFreezeExpiresAt(response.expiresAt);
+    } else {
+      setFreezeExpiresAt(null);
+    }
+
+    setLockedPrice(value);
+    return response;
   };
 
   const handleBooking = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!user) {
-      alert("Please log in to continue.");
-      return;
-    }
-
-    if (!selectedSeat) {
-      alert("Please select a seat before booking.");
-      return;
-    }
-
     if (booking) return;
+
+    if (!user?.id) {
+      setError("Please log in to continue.");
+      return;
+    }
+
+    if (!selectedSeat?.seatNumber) {
+      setError("Please select an available seat.");
+      return;
+    }
+
+    if (flight.availableSeats < 1) {
+      setError("No seats are available for this flight.");
+      return;
+    }
 
     try {
       setBooking(true);
+      setError("");
+
+      // Get or create a valid freeze immediately before booking.
+      const freeze = await handleFreezePrice();
+
+      const priceToBook = Number(freeze?.lockedPrice ?? freeze?.price);
+
+      if (!Number.isFinite(priceToBook) || priceToBook < 0) {
+        throw new Error("Could not verify the frozen price.");
+      }
+
+      if (freeze?.expiresAt) {
+        if (new Date(freeze.expiresAt).getTime() <= Date.now()) {
+          throw new Error("Price freeze expired. Please try again.");
+        }
+      }
 
       const bookingData = await handleflightbooking(
         user.id,
         flight.id,
         quantity,
-        grandTotal,
-        selectedSeat.seatNumber,
+        priceToBook,
+        String(selectedSeat.seatNumber),
       );
-
-      alert("Flight booked successfully!");
 
       const currentBookings = Array.isArray(user.bookings) ? user.bookings : [];
 
@@ -405,17 +430,30 @@ const BookFlightPage = () => {
         }),
       );
 
+      alert("Flight booked successfully!");
+
       setOpen(false);
-      setQuantity(1);
       setSelectedSeat(null);
+      setLockedPrice(null);
+      setFreezeExpiresAt(null);
 
       await router.push({
         pathname: "/recommendation",
         query: { afterBooking: "1" },
       });
-    } catch (error) {
-      console.error("Error while booking flight:", error);
-      alert("Flight booking failed. Please try again.");
+    } catch (e: any) {
+      console.error("Flight booking failed:", {
+        status: e?.response?.status,
+        data: e?.response?.data,
+        message: e?.message,
+      });
+
+      setError(
+        e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          "Flight booking failed. Please try again.",
+      );
     } finally {
       setBooking(false);
     }
@@ -475,16 +513,8 @@ const BookFlightPage = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quantity">Number of Tickets</Label>
-            <Input
-              id="quantity"
-              type="number"
-              min={1}
-              max={Math.max(1, flight.availableSeats || 1)}
-              value={quantity}
-              onChange={handleQuantityChange}
-            />
-
+            <Label>Number of Tickets</Label>
+            <Input value="1" readOnly />
             <p className="text-xs text-gray-500">
               {flight.availableSeats} seats available
             </p>
@@ -494,8 +524,17 @@ const BookFlightPage = () => {
         <FlightSeatMap
           flightId={flight.id}
           selectedSeat={selectedSeat}
-          onSeatSelect={(seat) => setSelectedSeat(seat)}
+          onSeatSelect={(seat) => {
+            setSelectedSeat(seat);
+            setError("");
+          }}
         />
+
+        {selectedSeat?.seatNumber && (
+          <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+            Selected seat: <strong>{selectedSeat.seatNumber}</strong>
+          </div>
+        )}
 
         <div className="rounded-lg bg-gray-100 p-4">
           <h3 className="mb-4 flex items-center text-lg font-bold">
@@ -514,14 +553,39 @@ const BookFlightPage = () => {
             </div>
 
             <div className="mt-2 flex justify-between border-t pt-3 text-lg font-bold">
-              <span>Total Amount</span>
+              <span>Displayed Total</span>
               <span>₹ {grandTotal.toLocaleString("en-IN")}</span>
             </div>
+
+            {lockedPrice !== null && (
+              <div className="rounded-lg bg-emerald-50 p-3 text-emerald-800">
+                <div className="font-semibold">Frozen price</div>
+                <div>₹{lockedPrice.toLocaleString("en-IN")}</div>
+                {freezeExpiresAt && (
+                  <p className="mt-1 text-xs">
+                    Expires: {new Date(freezeExpiresAt).toLocaleString("en-IN")}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={booking}>
-          {booking ? "Processing..." : "Proceed to Payment"}
+        {error && (
+          <p
+            role="alert"
+            className="whitespace-pre-wrap rounded-lg bg-rose-50 p-3 text-sm text-rose-700"
+          >
+            {error}
+          </p>
+        )}
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={booking || !user?.id || !selectedSeat?.seatNumber}
+        >
+          {booking ? "Processing..." : "Confirm Flight Booking"}
         </Button>
       </form>
     </DialogContent>
@@ -532,7 +596,6 @@ const BookFlightPage = () => {
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
-            {/* Flight details */}
             <section className="rounded-xl bg-white p-6 shadow-sm">
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -619,7 +682,6 @@ const BookFlightPage = () => {
               </div>
             </section>
 
-            {/* Dynamic pricing */}
             {user && (
               <DynamicPricingPanel
                 type="FLIGHT"
@@ -628,7 +690,6 @@ const BookFlightPage = () => {
               />
             )}
 
-            {/* Cancellation policy and reviews */}
             <section className="rounded-xl bg-white p-6 shadow-sm">
               <h2 className="mb-5 flex items-center text-lg font-bold">
                 <AlertCircle className="mr-2 h-5 w-5 text-orange-500" />
@@ -663,7 +724,6 @@ const BookFlightPage = () => {
               </div>
             </section>
 
-            {/* Hotel offers */}
             <section className="rounded-xl bg-white p-6 shadow-sm">
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="flex items-center text-lg font-bold">
@@ -731,7 +791,6 @@ const BookFlightPage = () => {
             </section>
           </div>
 
-          {/* Fare summary */}
           <aside className="lg:col-span-1">
             <div className="sticky top-24 rounded-xl bg-white p-6 shadow-sm">
               <h2 className="mb-6 flex items-center text-lg font-bold">
@@ -753,6 +812,13 @@ const BookFlightPage = () => {
                   <span>Total Amount</span>
                   <span>₹ {grandTotal.toLocaleString("en-IN")}</span>
                 </div>
+
+                {lockedPrice !== null && (
+                  <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+                    <p className="font-semibold">Frozen price</p>
+                    <p>₹{lockedPrice.toLocaleString("en-IN")}</p>
+                  </div>
+                )}
               </div>
 
               <Dialog open={open} onOpenChange={setOpen}>
@@ -783,7 +849,6 @@ const BookFlightPage = () => {
                 )}
               </Dialog>
 
-              {/* Promo codes */}
               <div className="mt-8 rounded-xl bg-[#FFF8E7] p-5">
                 <h3 className="mb-4 flex items-center font-bold">
                   <Gift className="mr-2 h-5 w-5 text-yellow-600" />

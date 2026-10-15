@@ -76,10 +76,14 @@ export const editprofile = async (
 export const getflight = async () => {
   try {
     const res = await axios.get(`${BACKEND_URL}/flight`);
-    const data = res.data;
-    return data;
+    return res.data;
   } catch (error) {
-    console.log(data);
+    console.error(
+      "Get flights failed:",
+      error.response?.status,
+      error.response?.data || error.message,
+    );
+    throw error;
   }
 };
 
@@ -199,12 +203,17 @@ export const handleflightbooking = async (
   selectedSeat,
 ) => {
   try {
-    const url = `${BACKEND_URL}/booking/flight?userId=${userId}&flightId=${flightId}&seats=${seats}&price=${price}&selectedSeat=${encodeURIComponent(selectedSeat)}`;
-    const res = await axios.post(url);
-    const data = res.data;
-    return data;
+    const res = await axios.post(`${BACKEND_URL}/booking/flight`, null, {
+      params: { userId, flightId, seats, price, selectedSeat },
+    });
+
+    return res.data;
   } catch (error) {
-    console.log(error);
+    console.error(
+      "Flight booking failed:",
+      error.response?.status,
+      error.response?.data || error.message,
+    );
     throw error;
   }
 };
