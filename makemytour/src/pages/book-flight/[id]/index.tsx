@@ -13,18 +13,9 @@ import {
   ArrowRight,
   Ticket,
 } from "lucide-react";
-
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type FormEvent,
-} from "react";
-
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { getflight, handleflightbooking } from "@/api";
 import { useDispatch, useSelector } from "react-redux";
-
 import {
   Dialog,
   DialogContent,
@@ -32,12 +23,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setUser } from "@/store";
-
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
 import FlightSeatMap from "@/components/SeatRoom/FlightSeatMap";
@@ -49,6 +38,7 @@ interface Flight {
   flightName: string;
   from: string;
   to: string;
+  departureDate?: string;
   departureTime: string;
   arrivalTime: string;
   price: number;
@@ -75,56 +65,179 @@ interface PromoOffer {
   amount: number;
 }
 
+const normalizeFlight = (raw: any): Flight => ({
+  id: Number(raw.id),
+  flightName: raw.flightName ?? raw.flight_name ?? "",
+  from: raw.from ?? raw.departureCity ?? raw.departure_city ?? "",
+  to: raw.to ?? raw.arrivalCity ?? raw.arrival_city ?? "",
+  departureDate: raw.departureDate ?? raw.departure_date ?? "",
+  departureTime: raw.departureTime ?? raw.departure_time ?? "",
+  arrivalTime: raw.arrivalTime ?? raw.arrival_time ?? "",
+  price: Number(raw.price ?? 0),
+  availableSeats: Number(raw.availableSeats ?? raw.available_seats ?? 0),
+});
+
+// Handles date-only strings, ISO date-time strings, and common time formats.
+const formatDate = (dateString?: string): string => {
+  if (!dateString) return "Date unavailable";
+
+  const value = String(dateString).trim();
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (dateOnly) {
+    const [, year, month, day] = dateOnly;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const parseTime = (value?: string): number | null => {
+  if (!value) return null;
+
+  const input = value.trim();
+
+  // ISO date-time value
+  if (input.includes("T")) {
+    const date = new Date(input);
+    if (!Number.isNaN(date.getTime())) {
+      return date.getHours() * 60 + date.getMinutes();
+    }
+  }
+
+  const match = input.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+
+  if (!match) return null;
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[4]?.toUpperCase();
+
+  if (minutes > 59 || hours > 24) return null;
+
+  if (period === "PM" && hours < 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+
+  if (hours > 23) return null;
+
+  return hours * 60 + minutes;
+};
+
+const formatTime = (value?: string): string => {
+  if (!value) return "Time unavailable";
+
+  const minutes = parseTime(value);
+
+  if (minutes === null) {
+    // Return original value rather than showing "Invalid Date".
+    return value;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+
+  return `${String(hours % 12 || 12).padStart(2, "0")}:${String(mins).padStart(
+    2,
+    "0",
+  )} ${hours >= 12 ? "PM" : "AM"}`;
+};
+
+const getFlightDuration = (
+  departureTime: string,
+  arrivalTime: string,
+): string => {
+  const departure = parseTime(departureTime);
+  const arrival = parseTime(arrivalTime);
+
+  if (departure === null || arrival === null) {
+    return "Duration unavailable";
+  }
+
+  let difference = arrival - departure;
+
+  // Arrival may be on the following day.
+  if (difference < 0) difference += 24 * 60;
+
+  const hours = Math.floor(difference / 60);
+  const minutes = difference % 60;
+
+  if (difference === 0) return "Duration unavailable";
+
+  return `${hours}h ${minutes}m`;
+};
+
 const BookFlightPage = () => {
   const router = useRouter();
   const { id } = router.query;
+
   const [flights, setFlights] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedSeat, setSelectedSeat] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
+  const [booking, setBooking] = useState(false);
+
   const user = useSelector((state: any) => state.user.user) as User | null;
   const dispatch = useDispatch();
-  const hasFetched = useRef(false);
 
   useEffect(() => {
-    const fetchFlights = async () => {
-      if (!id || hasFetched.current) {
-        return;
-      }
-      hasFetched.current = true;
+    if (!router.isReady || !id) return;
 
+    let cancelled = false;
+
+    const fetchFlights = async () => {
       try {
         setLoading(true);
-        const data = await getflight();
-        const flightId = Number(id);
-        const filteredFlights = data.filter(
-          (flight: Flight) => flight.id === flightId,
-        );
 
-        setFlights(filteredFlights);
+        const data = await getflight();
+        const list = Array.isArray(data) ? data.map(normalizeFlight) : [];
+        const flightId = Number(Array.isArray(id) ? id[0] : id);
+
+        if (!cancelled) {
+          setFlights(list.filter((flight) => flight.id === flightId));
+        }
       } catch (error) {
         console.error("Error fetching flights:", error);
-        setFlights([]);
+        if (!cancelled) setFlights([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchFlights();
-  }, [id]);
 
-  if (loading) {
-    return <Loader />;
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, id]);
+
+  if (loading) return <Loader />;
 
   if (flights.length === 0) {
     return (
-      <div className="min-h-screen bg-[#f4f7fa] flex items-center justify-center px-4">
-        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-          <Plane className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+      <div className="flex min-h-screen items-center justify-center bg-[#f4f7fa] px-4">
+        <div className="rounded-xl bg-white p-8 text-center shadow-sm">
+          <Plane className="mx-auto mb-4 h-12 w-12 text-gray-400" />
           <h2 className="text-xl font-bold text-gray-800">No Flight Found</h2>
-          <p className="text-gray-500 mt-2">
+          <p className="mt-2 text-gray-500">
             No flight data is available for this flight ID.
           </p>
           <Button className="mt-5" onClick={() => router.back()}>
@@ -136,26 +249,12 @@ const BookFlightPage = () => {
   }
 
   const flight = flights[0];
-  const getFlightDuration = (departureTime: string, arrivalTime: string) => {
-    const departure = new Date(departureTime);
-    const arrival = new Date(arrivalTime);
-    const difference = arrival.getTime() - departure.getTime();
-
-    if (difference <= 0) {
-      return "Non Stop";
-    }
-
-    const totalMinutes = Math.floor(difference / (1000 * 60));
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours}h ${minutes}m`;
-  };
-
   const duration = getFlightDuration(flight.departureTime, flight.arrivalTime);
-  const taxPercentage = 0.18;
+
+  const taxesPerTicket = Math.round(flight.price * 0.18);
   const otherServicesPerTicket = 249;
   const discountPerTicket = 250;
-  const taxesPerTicket = Math.round(flight.price * taxPercentage);
+
   const totalPrice = flight.price * quantity;
   const totalTaxes = taxesPerTicket * quantity;
   const totalOtherServices = otherServicesPerTicket * quantity;
@@ -166,11 +265,10 @@ const BookFlightPage = () => {
   const flightDetails = {
     flightNo: `MMT-${flight.id}`,
     aircraft: "Airbus A320",
-    airline: flight.flightName,
     cabinBaggage: "7 Kgs / Adult",
     checkInBaggage: "15 Kgs (1 piece only) / Adult",
-    departureTerminal: `${flight.from} International Airport`,
-    arrivalTerminal: `${flight.to} International Airport`,
+    departureTerminal: `${flight.from} Airport`,
+    arrivalTerminal: `${flight.to} Airport`,
   };
 
   const promoOffers: PromoOffer[] = [
@@ -203,7 +301,7 @@ const BookFlightPage = () => {
       price: 43875,
       image:
         "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=800",
-      location: `Connaught Place, ${flight.to}`,
+      location: `City Centre, ${flight.to}`,
     },
     {
       name: "Hotel Kian",
@@ -211,28 +309,11 @@ const BookFlightPage = () => {
       price: 1968,
       image:
         "https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&w=800",
-      location: `Karol Bagh, ${flight.to}`,
+      location: `City Centre, ${flight.to}`,
     },
   ];
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-
-    if (Number.isNaN(date.getTime())) {
-      return dateString;
-    }
-
-    return date.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const handleQuantityChange = (event: ChangeEvent<HTMLInputElement>) => {
-    event.preventDefault();
     const value = Number.parseInt(event.target.value, 10);
 
     if (Number.isNaN(value)) {
@@ -240,23 +321,28 @@ const BookFlightPage = () => {
       return;
     }
 
-    const validQuantity = Math.max(1, Math.min(value, flight.availableSeats));
-    setQuantity(validQuantity);
+    const maxSeats = Math.max(1, flight.availableSeats || 1);
+    setQuantity(Math.max(1, Math.min(value, maxSeats)));
   };
 
-  const handleBooking = async (event: FormEvent) => {
+  const handleBooking = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!user) {
+      alert("Please log in to continue.");
       return;
     }
 
     if (!selectedSeat) {
-      alert("Please select a seat before booking");
+      alert("Please select a seat before booking.");
       return;
     }
 
+    if (booking) return;
+
     try {
+      setBooking(true);
+
       const bookingData = await handleflightbooking(
         user.id,
         flight.id,
@@ -265,168 +351,131 @@ const BookFlightPage = () => {
         selectedSeat.seatNumber,
       );
 
-      alert("Flight is Booked Successfully");
+      alert("Flight booked successfully!");
 
       const currentBookings = Array.isArray(user.bookings) ? user.bookings : [];
-      const updatedUser = {
-        ...user,
-        bookings: [...currentBookings, bookingData],
-      };
 
-      dispatch(setUser(updatedUser));
+      dispatch(
+        setUser({
+          ...user,
+          bookings: [...currentBookings, bookingData],
+        }),
+      );
+
       setOpen(false);
       setQuantity(1);
+      setSelectedSeat(null);
+
       await router.push({
         pathname: "/recommendation",
         query: { afterBooking: "1" },
       });
-      
     } catch (error) {
       console.error("Error while booking flight:", error);
-      alert("Flight booking failed");
+      alert("Flight booking failed. Please try again.");
+    } finally {
+      setBooking(false);
     }
   };
 
   const BookingContent = () => (
-    <DialogContent className="sm:max-w-[600px] bg-white">
+    <DialogContent className="max-h-[90vh] overflow-y-auto bg-white sm:max-w-[600px]">
       <DialogHeader>
-        <DialogTitle className="text-2xl font-bold flex items-center">
-          <Plane className="w-6 h-6 mr-2" />
+        <DialogTitle className="flex items-center text-2xl font-bold">
+          <Plane className="mr-2 h-6 w-6" />
           Flight Booking Details
         </DialogTitle>
       </DialogHeader>
 
-      <form onSubmit={handleBooking} className="grid gap-6 mt-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <form onSubmit={handleBooking} className="mt-4 grid gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="flightName" className="flex items-center">
-              <Plane className="w-4 h-4 mr-2" />
-              Flight Name
-            </Label>
-
+            <Label htmlFor="flightName">Flight Name</Label>
             <Input id="flightName" value={flight.flightName} readOnly />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="from" className="flex items-center">
-              <MapPin className="w-4 h-4 mr-2" />
-              From
-            </Label>
-
+            <Label htmlFor="from">From</Label>
             <Input id="from" value={flight.from} readOnly />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="to" className="flex items-center">
-              <MapPin className="w-4 h-4 mr-2" />
-              To
-            </Label>
-
+            <Label htmlFor="to">To</Label>
             <Input id="to" value={flight.to} readOnly />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="departureTime" className="flex items-center">
-              <Calendar className="w-4 h-4 mr-2" />
-              Departure Time
-            </Label>
+            <Label htmlFor="departureDate">Departure Date</Label>
+            <Input
+              id="departureDate"
+              value={formatDate(flight.departureDate)}
+              readOnly
+            />
+          </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="departureTime">Departure Time</Label>
             <Input
               id="departureTime"
-              value={formatDate(flight.departureTime)}
+              value={formatTime(flight.departureTime)}
               readOnly
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="arrivalTime" className="flex items-center">
-              <Clock className="w-4 h-4 mr-2" />
-              Arrival Time
-            </Label>
-
+            <Label htmlFor="arrivalTime">Arrival Time</Label>
             <Input
               id="arrivalTime"
-              value={formatDate(flight.arrivalTime)}
+              value={formatTime(flight.arrivalTime)}
               readOnly
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quantity" className="flex items-center">
-              <Ticket className="w-4 h-4 mr-2" />
-              Number of Tickets
-            </Label>
-
+            <Label htmlFor="quantity">Number of Tickets</Label>
             <Input
               id="quantity"
               type="number"
-              min="1"
-              max={flight.availableSeats}
+              min={1}
+              max={Math.max(1, flight.availableSeats || 1)}
               value={quantity}
               onChange={handleQuantityChange}
             />
-
             <p className="text-xs text-gray-500">
               {flight.availableSeats} seats available
             </p>
           </div>
         </div>
 
-        {/* Seat Selection */}
         <FlightSeatMap
           flightId={flight.id}
           selectedSeat={selectedSeat}
           onSeatSelect={(seat) => setSelectedSeat(seat)}
         />
 
-        <div className="bg-gray-100 rounded-lg p-4">
-          <h3 className="text-lg font-bold mb-4 flex items-center">
-            <CreditCard className="w-5 h-5 mr-2" />
+        <div className="rounded-lg bg-gray-100 p-4">
+          <h3 className="mb-4 flex items-center text-lg font-bold">
+            <CreditCard className="mr-2 h-5 w-5" />
             Fare Summary
           </h3>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Base Fare</span>
-              <span className="font-medium">
-                ₹ {totalPrice.toLocaleString("en-IN")}
-              </span>
+          <div className="space-y-3">
+            <FareRow label="Base Fare" value={totalPrice} />
+            <FareRow label="Taxes and Surcharges" value={totalTaxes} />
+            <FareRow label="Other Services" value={totalOtherServices} />
+            <div className="flex justify-between text-green-600">
+              <span>Discounts</span>
+              <span>- ₹ {totalDiscounts.toLocaleString("en-IN")}</span>
             </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Taxes and Surcharges</span>
-              <span className="font-medium">
-                ₹ {totalTaxes.toLocaleString("en-IN")}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Other Services</span>
-              <span className="font-medium">
-                ₹ {totalOtherServices.toLocaleString("en-IN")}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center text-green-600">
-              <span className="font-medium">Discounts</span>
-              <span className="font-medium">
-                - ₹ {totalDiscounts.toLocaleString("en-IN")}
-              </span>
-            </div>
-
-            <div className="border-t pt-2 mt-2">
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-lg">Total Amount</span>
-                <span className="font-bold text-lg">
-                  ₹ {grandTotal.toLocaleString("en-IN")}
-                </span>
-              </div>
+            <div className="mt-2 flex justify-between border-t pt-3 text-lg font-bold">
+              <span>Total Amount</span>
+              <span>₹ {grandTotal.toLocaleString("en-IN")}</span>
             </div>
           </div>
         </div>
 
-        <Button type="submit" className="w-full mt-2">
-          Proceed to Payment
+        <Button type="submit" className="w-full" disabled={booking}>
+          {booking ? "Processing..." : "Proceed to Payment"}
         </Button>
       </form>
     </DialogContent>
@@ -434,86 +483,66 @@ const BookFlightPage = () => {
 
   return (
     <div className="min-h-screen bg-[#f4f7fa]">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Flight Details */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            {/* Flight details */}
+            <section className="rounded-xl bg-white p-6 shadow-sm">
+              <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div className="flex items-center flex-wrap gap-4 mb-2">
-                    <h2 className="text-lg font-bold flex items-center">
-                      <span>{flight.from}</span>
-                      <ArrowRight className="w-5 h-5 mx-2" />
-                      <span>{flight.to}</span>
-                    </h2>
-                    <span className="bg-green-100 text-green-600 text-xs px-3 py-1 rounded-full font-medium">
-                      CANCELLATION FEES APPLY
-                    </span>
-                  </div>
+                  <h2 className="mb-2 flex items-center text-lg font-bold">
+                    <span>{flight.from}</span>
+                    <ArrowRight className="mx-2 h-5 w-5" />
+                    <span>{flight.to}</span>
+                  </h2>
 
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    <span>{formatDate(flight.departureTime)}</span>
-                    <span className="mx-2">•</span>
-                    <Clock className="w-4 h-4 mr-2" />
-                    <span>Non Stop - {duration}</span>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                    <Calendar className="h-4 w-4" />
+                    <span>{formatDate(flight.departureDate)}</span>
+                    <span>•</span>
+                    <Clock className="h-4 w-4" />
+                    <span>{duration}</span>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="text-blue-600 text-sm font-medium hover:text-blue-700 flex items-center"
-                >
-                  <Info className="w-4 h-4 mr-1" />
-                  View Fare Rules
-                </button>
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                  CANCELLATION FEES APPLY
+                </span>
               </div>
 
-              <div className="flex items-center space-x-4 mb-6">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <Plane className="w-6 h-6 text-blue-600" />
+              <div className="mb-6 flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                  <Plane className="h-6 w-6 text-blue-600" />
                 </div>
-
                 <div>
                   <div className="font-semibold">{flight.flightName}</div>
                   <div className="text-sm text-gray-600">
                     {flightDetails.flightNo} • {flightDetails.aircraft}
                   </div>
                 </div>
-
                 <div className="ml-auto text-sm">
-                  <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full">
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-600">
                     Economy
                   </span>
-                  <span className="ml-2 text-gray-600">MMTSPECIAL</span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap md:flex-nowrap justify-between items-start gap-6 border-t pt-6">
+              <div className="flex flex-wrap items-start justify-between gap-6 border-t pt-6 md:flex-nowrap">
                 <div>
                   <div className="text-2xl font-bold">
-                    {new Date(flight.departureTime).toLocaleTimeString(
-                      "en-IN",
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
+                    {formatTime(flight.departureTime)}
                   </div>
-
-                  <div className="text-sm text-gray-600 mt-1 flex items-start">
-                    <MapPin className="w-4 h-4 mr-1 flex-shrink-0 mt-0.5" />
+                  <div className="mt-1 flex items-start text-sm text-gray-600">
+                    <MapPin className="mr-1 mt-0.5 h-4 w-4 shrink-0" />
                     {flightDetails.departureTerminal}
                   </div>
                 </div>
 
-                <div className="text-center flex-shrink-0">
-                  <div className="text-sm text-gray-600 mb-1">{duration}</div>
-                  <div className="w-32 h-0.5 bg-gray-300 relative my-2">
-                    <div className="absolute -top-2 right-0 w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center">
-                      <Plane className="w-3 h-3 text-gray-600" />
+                <div className="shrink-0 text-center">
+                  <div className="mb-1 text-sm text-gray-600">{duration}</div>
+                  <div className="relative my-2 h-0.5 w-32 bg-gray-300">
+                    <div className="absolute -top-2 right-0 flex h-4 w-4 items-center justify-center rounded-full bg-gray-300">
+                      <Plane className="h-3 w-3 text-gray-600" />
                     </div>
                   </div>
                   <div className="text-xs text-gray-500">Non-stop</div>
@@ -521,33 +550,27 @@ const BookFlightPage = () => {
 
                 <div className="text-right">
                   <div className="text-2xl font-bold">
-                    {new Date(flight.arrivalTime).toLocaleTimeString("en-IN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatTime(flight.arrivalTime)}
                   </div>
-
-                  <div className="text-sm text-gray-600 mt-1 flex items-start justify-end">
-                    <MapPin className="w-4 h-4 mr-1 flex-shrink-0 mt-0.5" />
+                  <div className="mt-1 flex items-start justify-end text-sm text-gray-600">
+                    <MapPin className="mr-1 mt-0.5 h-4 w-4 shrink-0" />
                     {flightDetails.arrivalTerminal}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-6 mt-6 text-sm text-gray-600">
+              <div className="mt-6 flex flex-wrap gap-6 text-sm text-gray-600">
                 <div className="flex items-center">
-                  <Luggage className="w-5 h-5 mr-2 text-gray-500" />
-                  <span>Cabin Baggage: {flightDetails.cabinBaggage}</span>
+                  <Luggage className="mr-2 h-5 w-5 text-gray-500" />
+                  Cabin Baggage: {flightDetails.cabinBaggage}
                 </div>
-
                 <div className="flex items-center">
-                  <Luggage className="w-5 h-5 mr-2 text-gray-500" />
-                  <span>Check-in Baggage: {flightDetails.checkInBaggage}</span>
+                  <Luggage className="mr-2 h-5 w-5 text-gray-500" />
+                  Check-in Baggage: {flightDetails.checkInBaggage}
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Dynamic Pricing */}
             {user && (
               <DynamicPricingPanel
                 type="FLIGHT"
@@ -556,113 +579,89 @@ const BookFlightPage = () => {
               />
             )}
 
-            {/* Cancellation Policy */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold flex items-center">
-                  <AlertCircle className="w-5 h-5 mr-2 text-orange-500" />
-                  Cancellation & Date Change Policy
-                </h2>
+            {/* Cancellation policy and reviews */}
+            <section className="rounded-xl bg-white p-6 shadow-sm">
+              <h2 className="mb-5 flex items-center text-lg font-bold">
+                <AlertCircle className="mr-2 h-5 w-5 text-orange-500" />
+                Cancellation & Date Change Policy
+              </h2>
 
-                <button
-                  type="button"
-                  className="text-blue-600 text-sm font-medium hover:text-blue-700"
-                >
-                  View Policy
-                </button>
-              </div>
-
-              <div className="bg-gray-50 p-6 rounded-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Plane className="w-5 h-5 text-blue-600" />
-                    </div>
-
-                    <span className="font-semibold">
-                      {flight.from} - {flight.to}
-                    </span>
-                  </div>
-
-                  <div className="font-bold text-lg">
+              <div className="rounded-xl bg-gray-50 p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <span className="font-semibold">
+                    {flight.from} - {flight.to}
+                  </span>
+                  <span className="text-lg font-bold">
                     ₹ {flight.price.toLocaleString("en-IN")}
-                  </div>
+                  </span>
                 </div>
 
-                <div className="h-2.5 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full"></div>
-                <div className="flex justify-between mt-2 text-xs text-gray-600">
+                <div className="h-2.5 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500" />
+                <div className="mt-2 flex justify-between text-xs text-gray-600">
                   <span>Now</span>
-                  <span>{formatDate(flight.departureTime)}</span>
+                  <span>{formatDate(flight.departureDate)}</span>
                   <span>Departure</span>
                 </div>
-
-                <div id="reviews" className="bg-white rounded-xl shadow-sm p-6">
-                  <ReviewSection
-                    itemId={flight.id}
-                    itemType="FLIGHT"
-                    currentUserId={user?.id}
-                  />
-                </div>
               </div>
-            </div>
 
-            {/* Hotel Offers */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold flex items-center">
-                  <Gift className="w-5 h-5 mr-2 text-red-500" />
+              <div id="reviews" className="mt-6 rounded-xl bg-white">
+                <ReviewSection
+                  itemId={flight.id}
+                  itemType="FLIGHT"
+                  currentUserId={user?.id}
+                />
+              </div>
+            </section>
+
+            {/* Hotel offers */}
+            <section className="rounded-xl bg-white p-6 shadow-sm">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="flex items-center text-lg font-bold">
+                  <Gift className="mr-2 h-5 w-5 text-red-500" />
                   Book a Flight & unlock these offers
                 </h2>
-                <span className="bg-red-100 text-red-600 text-xs px-3 py-1 rounded-full font-medium">
+                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-600">
                   Flyer Exclusive Deal
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                 {hotels.map((hotel) => (
                   <div
                     key={hotel.name}
-                    className="bg-white border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                    className="overflow-hidden rounded-xl border transition-shadow hover:shadow-md"
                   >
                     <div className="relative">
                       <img
                         src={hotel.image}
                         alt={hotel.name}
-                        className="w-full h-48 object-cover"
+                        className="h-48 w-full object-cover"
                       />
-
-                      <div className="absolute top-3 right-3 bg-white px-2 py-1 rounded-full text-xs font-medium">
+                      <span className="absolute right-3 top-3 rounded-full bg-white px-2 py-1 text-xs font-medium">
                         Best Seller
-                      </div>
+                      </span>
                     </div>
 
                     <div className="p-4">
-                      <h3 className="font-semibold text-lg mb-1">
+                      <h3 className="mb-1 text-lg font-semibold">
                         {hotel.name}
                       </h3>
-
-                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                        <MapPin className="w-4 h-4 mr-1" />
+                      <div className="mb-2 flex items-center text-sm text-gray-600">
+                        <MapPin className="mr-1 h-4 w-4" />
                         {hotel.location}
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center text-yellow-400">
-                          {Array.from({
-                            length: hotel.rating,
-                          }).map((_, index) => (
-                            <Star
-                              key={index}
-                              className="w-4 h-4 fill-current"
-                            />
+                        <div className="flex text-yellow-400">
+                          {Array.from({ length: hotel.rating }).map((_, i) => (
+                            <Star key={i} className="h-4 w-4 fill-current" />
                           ))}
                         </div>
-
                         <div className="text-right">
                           <div className="text-xs text-gray-500">
                             Starting from
                           </div>
-                          <div className="font-bold text-lg">
+                          <div className="text-lg font-bold">
                             ₹ {hotel.price.toLocaleString("en-IN")}
                           </div>
                         </div>
@@ -671,59 +670,36 @@ const BookFlightPage = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Fare Summary */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-24">
-              <h2 className="text-lg font-bold mb-6 flex items-center">
-                <CreditCard className="w-5 h-5 mr-2 text-gray-600" />
+          {/* Fare summary */}
+          <aside className="lg:col-span-1">
+            <div className="sticky top-24 rounded-xl bg-white p-6 shadow-sm">
+              <h2 className="mb-6 flex items-center text-lg font-bold">
+                <CreditCard className="mr-2 h-5 w-5 text-gray-600" />
                 Fare Summary
               </h2>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Base Fare</span>
-                  <span className="font-medium">
-                    ₹ {totalPrice.toLocaleString("en-IN")}
-                  </span>
+              <div className="space-y-3">
+                <FareRow label="Base Fare" value={totalPrice} />
+                <FareRow label="Taxes and Surcharges" value={totalTaxes} />
+                <FareRow label="Other Services" value={totalOtherServices} />
+
+                <div className="flex justify-between text-green-600">
+                  <span>Discounts</span>
+                  <span>- ₹ {totalDiscounts.toLocaleString("en-IN")}</span>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Taxes and Surcharges</span>
-                  <span className="font-medium">
-                    ₹ {totalTaxes.toLocaleString("en-IN")}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Other Services</span>
-                  <span className="font-medium">
-                    ₹ {totalOtherServices.toLocaleString("en-IN")}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center text-green-600">
-                  <span className="font-medium">Discounts</span>
-                  <span className="font-medium">
-                    - ₹ {totalDiscounts.toLocaleString("en-IN")}
-                  </span>
-                </div>
-
-                <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-lg">Total Amount</span>
-                    <span className="font-bold text-lg">
-                      ₹ {grandTotal.toLocaleString("en-IN")}
-                    </span>
-                  </div>
+                <div className="flex justify-between border-t pt-3 text-lg font-bold">
+                  <span>Total Amount</span>
+                  <span>₹ {grandTotal.toLocaleString("en-IN")}</span>
                 </div>
               </div>
 
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
-                  <Button className="w-full bg-red-600 text-white hover:bg-red-700 mt-6">
+                  <Button className="mt-6 w-full bg-red-600 text-white hover:bg-red-700">
                     Book Now
                   </Button>
                 </DialogTrigger>
@@ -735,11 +711,9 @@ const BookFlightPage = () => {
                     <DialogHeader>
                       <DialogTitle>Login Required</DialogTitle>
                     </DialogHeader>
-
                     <p className="text-gray-600">
                       Please log in to continue with your booking.
                     </p>
-
                     <SignupDialog
                       trigger={
                         <Button className="w-full">Log In / Sign Up</Button>
@@ -749,61 +723,66 @@ const BookFlightPage = () => {
                 )}
               </Dialog>
 
-              {/* Promo Codes */}
-              <div className="mt-8">
-                <div className="bg-[#FFF8E7] p-6 rounded-xl">
-                  <h3 className="font-bold mb-4 flex items-center">
-                    <Gift className="w-5 h-5 mr-2 text-yellow-600" />
-                    PROMO CODES
-                  </h3>
+              {/* Promo codes */}
+              <div className="mt-8 rounded-xl bg-[#FFF8E7] p-5">
+                <h3 className="mb-4 flex items-center font-bold">
+                  <Gift className="mr-2 h-5 w-5 text-yellow-600" />
+                  PROMO CODES
+                </h3>
 
-                  <div className="relative mb-4">
-                    <input
-                      type="text"
-                      placeholder="Enter promo code here"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-                    />
-                  </div>
+                <input
+                  type="text"
+                  placeholder="Enter promo code here"
+                  className="mb-4 w-full rounded-lg border border-gray-200 px-4 py-3 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
 
-                  {promoOffers.map((offer) => (
-                    <div
-                      key={offer.code}
-                      className="bg-white p-4 rounded-lg mb-3 shadow-sm"
-                    >
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="radio"
-                          name="promo"
-                          className="mt-1.5 h-4 w-4 text-red-600 focus:ring-red-500"
-                        />
-
-                        <div>
-                          <div className="font-semibold text-red-600">
-                            {offer.code}
-                          </div>
-
-                          <p className="text-sm text-gray-600 mt-1">
-                            {offer.description}
-                          </p>
-
-                          <button
-                            type="button"
-                            className="text-blue-600 text-sm font-medium mt-2 hover:text-blue-700"
-                          >
-                            Terms & Conditions
-                          </button>
+                {promoOffers.map((offer) => (
+                  <div
+                    key={offer.code}
+                    className="mb-3 rounded-lg bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name="promo"
+                        className="mt-1.5 h-4 w-4 accent-red-600"
+                      />
+                      <div>
+                        <div className="font-semibold text-red-600">
+                          {offer.code}
                         </div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          {offer.description}
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                          onClick={() =>
+                            alert(`${offer.code}: ${offer.description}`)
+                          }
+                        >
+                          Terms & Conditions
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
     </div>
   );
 };
+
+function FareRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-gray-600">{label}</span>
+      <span className="font-medium">₹ {value.toLocaleString("en-IN")}</span>
+    </div>
+  );
+}
 
 export default BookFlightPage;
