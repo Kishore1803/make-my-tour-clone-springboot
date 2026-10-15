@@ -3,7 +3,7 @@ package com.makemytrip.makemytrip.models;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "seats")
+@Table(name = "flight_seats")
 public class Seat {
 
     @Id
