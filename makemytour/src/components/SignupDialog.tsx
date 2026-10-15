@@ -65,8 +65,8 @@ const SignupDialog = ({ trigger }: SignupDialogProps) => {
         const data = await signup(
           firstName,
           lastName,
-          phoneNumber,
           email,
+          phoneNumber,
           password,
         );
 
