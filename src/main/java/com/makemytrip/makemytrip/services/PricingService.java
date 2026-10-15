@@ -29,9 +29,6 @@ public class PricingService {
     
     @Autowired
     private PriceFreezeRepository freezeRepository;
-    
-    @Autowired
-    private PriceFreezeRepository priceFreezeRepository;
 
     private String normalizeType(String type) {
         if (type == null) throw new IllegalArgumentException("Type must be FLIGHT or HOTEL");
