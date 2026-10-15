@@ -226,7 +226,7 @@ export default function CancellationPolicyPage() {
           </button>
 
           <button
-            onClick={() => router.push("/manage-cancellation")}
+            onClick={() => router.push("/track-refunds")}
             className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
           >
             Track My Refunds
