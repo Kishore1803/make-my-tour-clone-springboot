@@ -1,14 +1,24 @@
 import axios from "axios";
 
-const BACKEND_URL = "https://make-my-tour-clone-springboot-backend.onrender.com";
+const BACKEND_URL =
+  "https://make-my-tour-clone-springboot-backend.onrender.com";
 
 export const login = async (email, password) => {
   try {
-    const url = `${BACKEND_URL}/user/login?email=${email}&password=${password}`;
-    const res = await axios.post(url);
-    const data = res.data;
-    return data;
+    const res = await axios.post(`${BACKEND_URL}/user/login`, null, {
+      params: {
+        email,
+        password,
+      },
+    });
+
+    return res.data;
   } catch (error) {
+    console.error(
+      "Login failed:",
+      error.response?.status,
+      error.response?.data || error.message,
+    );
     throw error;
   }
 };
