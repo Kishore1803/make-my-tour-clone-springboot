@@ -2,8 +2,6 @@
 import { useRouter } from "next/router";
 import PageHeader from "@/components/CancellationRefund/PageHearder";
 
-const router = useRouter();
-
 const policies = [
   {
     number: "01",
@@ -65,6 +63,9 @@ const refundExamples = [
 ];
 
 export default function CancellationPolicyPage() {
+
+  const router = useRouter();
+  
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
