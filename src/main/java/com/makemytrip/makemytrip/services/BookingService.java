@@ -40,11 +40,11 @@ public class BookingService {
             throw new IllegalArgumentException("User ID and flight ID are required.");
         }
 
-        if (seats <= 0) {
-            throw new IllegalArgumentException("Number of seats must be greater than zero.");
+        if (seats != 1) {
+            throw new IllegalArgumentException("Please book one seat at a time.");
         }
 
-        if (!Double.isFinite(price) || price < 0) {
+        if (!Double.isFinite(price) || price <= 0) {
             throw new IllegalArgumentException("Invalid booking price.");
         }
 
@@ -66,36 +66,33 @@ public class BookingService {
             throw new IllegalStateException("Selected seat is already booked.");
         }
 
-        if (flight.getAvailableSeats() < seats) {
-            throw new IllegalStateException("Not enough seats available.");
+        if (flight.getAvailableSeats() < 1) {
+            throw new IllegalStateException("No seats available.");
         }
 
-        // Update flight availability.
-        flight.setAvailableSeats(flight.getAvailableSeats() - seats);
+        flight.setAvailableSeats(flight.getAvailableSeats() - 1);
+        seat.setAvailable(false);
 
-        // Create booking.
         Booking booking = new Booking();
         booking.setType("FLIGHT");
         booking.setBookingId(flightId);
         booking.setDate(LocalDate.now().toString());
         booking.setBookedAt(LocalDateTime.now().toString());
-        booking.setQuantity(seats);
+        booking.setQuantity(1);
         booking.setTotalPrice(price);
         booking.setSelectedSeat(selectedSeat);
         booking.setCancellationStatus("BOOKED");
         booking.setRefundAmount(0.0);
         booking.setRefundStatus("NOT_APPLICABLE");
-        user.getBookings().add(booking);
-        seat.setAvailable(false);
 
+        if (user.getBookings() == null) {
+            throw new IllegalStateException("User bookings collection is not initialized.");
+        }
+
+        user.getBookings().add(booking);
         flightRepository.save(flight);
         seatRepository.save(seat);
         userRepository.save(user);
-
-        System.out.println("Flight booking saved.");
-        System.out.println("User ID: " + userId);
-        System.out.println("Flight ID: " + flightId);
-        System.out.println("Booking type: " + booking.getType());
         return booking;
     }
 
