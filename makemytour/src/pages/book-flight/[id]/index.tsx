@@ -276,7 +276,11 @@ const BookFlightPage = () => {
       dispatch(setUser(updatedUser));
       setOpen(false);
       setQuantity(1);
-      router.push("/profile");
+      await router.push({
+        pathname: "/recommendation",
+        query: { afterBooking: "1" },
+      });
+      
     } catch (error) {
       console.error("Error while booking flight:", error);
       alert("Flight booking failed");
@@ -591,7 +595,7 @@ const BookFlightPage = () => {
                   <span>{formatDate(flight.departureTime)}</span>
                   <span>Departure</span>
                 </div>
-                
+
                 <div id="reviews" className="bg-white rounded-xl shadow-sm p-6">
                   <ReviewSection
                     itemId={flight.id}

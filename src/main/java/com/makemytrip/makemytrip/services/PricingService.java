@@ -15,6 +15,7 @@ import java.util.List;
 
 @Service
 public class PricingService {
+	
     private static final BigDecimal HOLIDAY_RATE = new BigDecimal("0.20");
     private static final BigDecimal MIN_RATE = new BigDecimal("-0.50");
     private static final BigDecimal MAX_RATE = BigDecimal.ONE;

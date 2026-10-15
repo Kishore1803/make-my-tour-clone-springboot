@@ -204,11 +204,16 @@ export const handleflightbooking = async (
 
 export const handlehotelbooking = async (userId, hotelId, rooms, price) => {
   try {
-    const url = `${BACKEND_URL}/booking/flight?userId=${userId}&hotelId=${hotelId}&rooms=${rooms}&price=${price}`;
-    const res = await axios.post(url);
-    const data = res.data;
-    return data;
+    const response = await axios.post(`${BACKEND_URL}/booking/hotel`, null, {
+      params: { userId, hotelId, rooms, price },
+    });
+    console.log("Hotel booking response:", response.data);
+    return response.data;
   } catch (error) {
-    console.log(error);
+    console.error(
+      "Hotel booking failed:",
+      error.response?.data || error.message,
+    );
+    throw error;
   }
 };

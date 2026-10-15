@@ -49,13 +49,14 @@ const BookHotelPage = () => {
   const [quantity, setQuantity] = useState(1);
   const router = useRouter();
   const { id } = router.query;
+
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+
   const user = useSelector((state: any) => state.user.user);
   const dispatch = useDispatch();
 
-  // Prevent duplicate API request
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -63,15 +64,19 @@ const BookHotelPage = () => {
       if (!id || hasFetched.current) {
         return;
       }
+
       hasFetched.current = true;
 
       try {
         setLoading(true);
+
         const data = await gethotel();
         const hotelId = Number(id);
+
         const filteredData = data.filter(
           (hotel: Hotel) => hotel.id === hotelId,
         );
+
         setHotels(filteredData);
       } catch (error) {
         console.error("Error fetching hotels:", error);
@@ -93,9 +98,11 @@ const BookHotelPage = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Home className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+
           <h2 className="text-xl font-semibold text-gray-700">
             No hotel data available for this ID.
           </h2>
+
           <Button className="mt-4" onClick={() => router.back()}>
             Go Back
           </Button>
@@ -105,14 +112,17 @@ const BookHotelPage = () => {
   }
 
   const hotel = hotels[0];
+
   const hotelData = {
     name: "Magnum Resorts- Near Candolim Beach",
     rating: 3,
     maxRating: 5,
     propertyPhotos: 91,
     guestPhotos: 386,
+
     description:
       "One of the best hotels in North Goa, operating since 2001 catering to international and domestic individual and group travelers.",
+
     amenities: [
       {
         icon: <Pool className="w-5 h-5" />,
@@ -135,16 +145,18 @@ const BookHotelPage = () => {
     room: {
       type: "Standard Room",
       capacity: "Fits 2 Adults",
+
       features: [
         "No meals included",
         "10% off on food & beverage services",
         "Complimentary welcome drinks on arrival",
         "Non-Refundable",
       ],
+
       originalPrice: 8999,
-      discountedPrice: 664,
       taxes: 527,
     },
+
     location: {
       area: "Candolim",
       distance: "7 minutes walk to Candolim Beach",
@@ -152,8 +164,8 @@ const BookHotelPage = () => {
   };
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
     const value = Number.parseInt(e.target.value, 10);
+
     setQuantity(
       Number.isNaN(value)
         ? 1
@@ -161,76 +173,120 @@ const BookHotelPage = () => {
     );
   };
 
-  const totalPrice = hotel.pricePerNight * quantity;
-  const totalTaxes = hotelData.room.taxes * quantity;
-  const discountPerRoom = Math.max(
-    0,
-    hotelData.room.originalPrice - hotelData.room.discountedPrice,
-  );
-  const totalDiscounts = discountPerRoom * quantity;
-  const grandTotal = totalPrice + totalTaxes - totalDiscounts;
+  // PRICE CALCULATION
+  // Assumption: hotel.pricePerNight is already the discounted price.
 
-const handleBooking = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const originalPricePerRoom = Number(hotelData.room.originalPrice);
+  const discountedPricePerRoom = Number(hotel.pricePerNight);
+  const taxesPerRoom = Number(hotelData.room.taxes);
 
-  if (!user?.id) {
-    alert("Please log in to book a hotel.");
-    return;
-  }
+  const totalOriginalPrice = originalPricePerRoom * quantity;
+  const totalPrice = discountedPricePerRoom * quantity;
+  const totalTaxes = taxesPerRoom * quantity;
 
-  try {
-    const response = await handlehotelbooking(
-      user.id,
-      hotel.id,
-      quantity,
-      grandTotal,
-    );
+  // Discount is displayed only. Do not subtract it again.
+  const totalDiscounts = Math.max(0, totalOriginalPrice - totalPrice);
 
-    // Handle either a raw object or an Axios response.
-    const bookingData = response?.data ?? response;
+  // Final total = discounted room price + taxes.
+  const grandTotal = totalPrice + totalTaxes;
 
-    if (
-      !bookingData ||
-      typeof bookingData !== "object" ||
-      Array.isArray(bookingData)
-    ) {
-      throw new Error("Backend did not return valid booking data.");
+  const formatPrice = (amount: number) =>
+    amount.toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    });
+
+  const handleBooking = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+
+    if (!user?.id) {
+      alert("Please log in to book a hotel.");
+      return;
     }
 
-    const hotelBooking = {
-      ...bookingData,
-      bookingId: bookingData.bookingId ?? bookingData.id,
-      type: bookingData.type ?? "Hotel",
-      bookingType: bookingData.bookingType ?? "HOTEL",
-      totalPrice: bookingData.totalPrice ?? grandTotal,
-      quantity: bookingData.quantity ?? quantity,
-      date:
-        bookingData.date ??
-        bookingData.bookedAt ??
-        new Date().toISOString(),
-    };
+    if (
+      !Number.isFinite(discountedPricePerRoom) ||
+      discountedPricePerRoom <= 0 ||
+      !Number.isFinite(grandTotal) ||
+      grandTotal <= 0 ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      quantity > hotel.availableRooms
+    ) {
+      console.error("Invalid booking amount:", {
+        pricePerNight: hotel.pricePerNight,
+        quantity,
+        totalPrice,
+        totalTaxes,
+        grandTotal,
+      });
 
-    const currentBookings = Array.isArray(user.bookings)
-      ? user.bookings
-      : [];
+      alert("Invalid booking amount. Please refresh and try again.");
+      return;
+    }
 
-    dispatch(
-      setUser({
-        ...user,
-        bookings: [...currentBookings, hotelBooking],
-      }),
-    );
+    try {
+      const response = await handlehotelbooking(
+        user.id,
+        hotel.id,
+        quantity,
+        grandTotal,
+      );
 
-    setOpen(false);
-    setQuantity(1);
+      console.log("Full booking response:", response);
 
-    alert("Hotel booked successfully!");
-    await router.push("/profile");
-  } catch (error) {
-    console.error("Hotel booking failed:", error);
-    alert("Hotel booking failed. Check the backend response.");
-  }
-};
+      const bookingData = response?.data ?? response;
+
+      console.log("Booking data:", bookingData);
+
+      if (
+        !bookingData ||
+        typeof bookingData !== "object" ||
+        Array.isArray(bookingData)
+      ) {
+        console.error("Invalid booking response:", bookingData);
+
+        throw new Error("Backend returned an invalid booking response.");
+      }
+
+      const hotelBooking = {
+        ...bookingData,
+        bookingId: bookingData.bookingId ?? bookingData.id,
+        type: bookingData.type ?? "HOTEL",
+        bookingType: bookingData.bookingType ?? "HOTEL",
+        totalPrice: bookingData.totalPrice ?? grandTotal,
+        quantity: bookingData.quantity ?? quantity,
+        date:
+          bookingData.date ?? bookingData.bookedAt ?? new Date().toISOString(),
+      };
+
+      const currentBookings = Array.isArray(user.bookings) ? user.bookings : [];
+
+      dispatch(
+        setUser({
+          ...user,
+          bookings: [...currentBookings, hotelBooking],
+        }),
+      );
+
+      setOpen(false);
+      setQuantity(1);
+
+      alert("Hotel booked successfully!");
+
+      await router.push({
+        pathname: "/recommendation",
+        query: { afterBooking: "1" },
+      });
+    } catch (error) {
+      console.error("Hotel booking failed:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Hotel booking failed. Check the backend response.",
+      );
+    }
+  };
 
   const HotelContent = () => (
     <DialogContent className="sm:max-w-[600px] bg-white">
@@ -243,7 +299,6 @@ const handleBooking = async (e: React.FormEvent) => {
 
       <div className="grid gap-6 mt-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Hotel Name */}
           <div className="space-y-2">
             <Label htmlFor="hotelName" className="flex items-center">
               <MapPin className="w-4 h-4 mr-2" />
@@ -253,7 +308,6 @@ const handleBooking = async (e: React.FormEvent) => {
             <Input id="hotelName" value={hotel.hotelName} readOnly />
           </div>
 
-          {/* Location */}
           <div className="space-y-2">
             <Label htmlFor="location" className="flex items-center">
               <MapPin className="w-4 h-4 mr-2" />
@@ -263,7 +317,6 @@ const handleBooking = async (e: React.FormEvent) => {
             <Input id="location" value={hotel.location} readOnly />
           </div>
 
-          {/* Price Per Night */}
           <div className="space-y-2">
             <Label htmlFor="pricePerNight" className="flex items-center">
               <Ticket className="w-4 h-4 mr-2" />
@@ -272,12 +325,11 @@ const handleBooking = async (e: React.FormEvent) => {
 
             <Input
               id="pricePerNight"
-              value={`₹ ${hotel.pricePerNight.toLocaleString()}`}
+              value={`₹ ${formatPrice(discountedPricePerRoom)}`}
               readOnly
             />
           </div>
 
-          {/* Available Rooms */}
           <div className="space-y-2">
             <Label htmlFor="availableRooms" className="flex items-center">
               <Ticket className="w-4 h-4 mr-2" />
@@ -287,7 +339,6 @@ const handleBooking = async (e: React.FormEvent) => {
             <Input id="availableRooms" value={hotel.availableRooms} readOnly />
           </div>
 
-          {/* Number of Rooms */}
           <div className="space-y-2">
             <Label htmlFor="quantity" className="flex items-center">
               <Ticket className="w-4 h-4 mr-2" />
@@ -297,7 +348,7 @@ const handleBooking = async (e: React.FormEvent) => {
             <Input
               id="quantity"
               type="number"
-              min="1"
+              min={1}
               max={hotel.availableRooms}
               value={quantity}
               onChange={handleQuantityChange}
@@ -313,36 +364,40 @@ const handleBooking = async (e: React.FormEvent) => {
           </h3>
 
           <div className="space-y-2">
-            {/* Base Fare */}
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Base Fare</span>
-              <span className="font-medium">
-                ₹ {totalPrice.toLocaleString()}
+              <span className="text-gray-600">Original Room Price</span>
+
+              <span className="font-medium line-through text-gray-500">
+                ₹ {formatPrice(totalOriginalPrice)}
               </span>
             </div>
 
-            {/* Taxes */}
             <div className="flex justify-between items-center">
-              <span className="text-gray-600">Taxes and Extracharges</span>
-              <span className="font-medium">
-                ₹ {totalTaxes.toLocaleString()}
-              </span>
+              <span className="text-gray-600">Room Price After Discount</span>
+
+              <span className="font-medium">₹ {formatPrice(totalPrice)}</span>
             </div>
 
-            {/* Discounts */}
             <div className="flex justify-between items-center text-green-600">
-              <span className="font-medium">Discounts</span>
+              <span className="font-medium">Discount</span>
+
               <span className="font-medium">
-                - ₹ {totalDiscounts.toLocaleString()}
+                - ₹ {formatPrice(totalDiscounts)}
               </span>
             </div>
 
-            {/* Total */}
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Taxes and Extra Charges</span>
+
+              <span className="font-medium">₹ {formatPrice(totalTaxes)}</span>
+            </div>
+
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-lg">Total Amount</span>
+
                 <span className="font-bold text-lg">
-                  ₹ {grandTotal.toLocaleString()}
+                  ₹ {formatPrice(grandTotal)}
                 </span>
               </div>
             </div>
@@ -365,11 +420,15 @@ const handleBooking = async (e: React.FormEvent) => {
             <a href="/" className="text-blue-500">
               Home
             </a>
+
             <ChevronRight className="w-4 h-4 text-gray-400" />
+
             <a href="/" className="text-blue-500">
               {hotel.location}
             </a>
+
             <ChevronRight className="w-4 h-4 text-gray-400" />
+
             <span className="text-gray-600">{hotel.hotelName}</span>
           </div>
         </div>
@@ -398,6 +457,7 @@ const handleBooking = async (e: React.FormEvent) => {
               </div>
             </div>
 
+            {/* Hotel Images */}
             <div className="grid grid-cols-3 gap-4 mb-8">
               <div className="col-span-2 relative group cursor-pointer">
                 <img
@@ -408,6 +468,7 @@ const handleBooking = async (e: React.FormEvent) => {
 
                 <div className="absolute bottom-4 left-4 bg-white/90 px-3 py-1 rounded-full flex items-center space-x-1">
                   <Camera className="w-4 h-4" />
+
                   <span className="text-sm">
                     +{hotelData.propertyPhotos} Property Photos
                   </span>
@@ -432,6 +493,7 @@ const handleBooking = async (e: React.FormEvent) => {
 
                   <div className="absolute bottom-4 left-4 bg-white/90 px-3 py-1 rounded-full flex items-center space-x-1">
                     <Image className="w-4 h-4" />
+
                     <span className="text-sm">
                       +{hotelData.guestPhotos} Guest Photos
                     </span>
@@ -442,13 +504,16 @@ const handleBooking = async (e: React.FormEvent) => {
 
             <p className="text-gray-600 mb-6">
               {hotelData.description}
+
               <button type="button" className="text-blue-500 ml-2">
                 Read more
               </button>
             </p>
 
+            {/* Amenities */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Amenities</h2>
+
               <div className="flex flex-wrap gap-6">
                 {hotelData.amenities.map((amenity, index) => (
                   <div
@@ -459,6 +524,7 @@ const handleBooking = async (e: React.FormEvent) => {
                     <span>{amenity.name}</span>
                   </div>
                 ))}
+
                 <button type="button" className="text-blue-500">
                   + 31 Amenities
                 </button>
@@ -478,9 +544,11 @@ const handleBooking = async (e: React.FormEvent) => {
             </div>
           </div>
 
+          {/* Booking Card */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-lg p-6">
-              {user && (
+              {/* Dynamic pricing panel kept available */}
+              {/* {user && (
                 <div className="mt-6">
                   <DynamicPricingPanel
                     type="HOTEL"
@@ -488,13 +556,14 @@ const handleBooking = async (e: React.FormEvent) => {
                     userId={user.id}
                   />
                 </div>
-              )}
+              )} */}
 
               <h3 className="text-xl font-semibold mb-4">
                 {hotelData.room.type}
               </h3>
 
               <p className="text-gray-600 mb-4">{hotelData.room.capacity}</p>
+
               <ul className="space-y-3 mb-6">
                 {hotelData.room.features.map((feature, index) => (
                   <li key={index} className="flex items-start space-x-2">
@@ -510,8 +579,9 @@ const handleBooking = async (e: React.FormEvent) => {
                   <span className="text-gray-800 font-semibold">
                     Price Per Night:
                   </span>
+
                   <span className="text-lg font-medium text-gray-800">
-                    ₹ {hotel.pricePerNight.toLocaleString()}
+                    ₹ {formatPrice(discountedPricePerRoom)}
                   </span>
                 </div>
 
@@ -520,6 +590,7 @@ const handleBooking = async (e: React.FormEvent) => {
                   <span className="text-gray-800 font-semibold">
                     Available Rooms:
                   </span>
+
                   <span className="text-lg font-medium text-gray-800">
                     {hotel.availableRooms}
                   </span>
@@ -530,24 +601,36 @@ const handleBooking = async (e: React.FormEvent) => {
                   <h4 className="text-gray-800 font-semibold mb-2">
                     Amenities:
                   </h4>
+
                   <p className="text-gray-600">{hotel.amenities}</p>
                 </div>
               </div>
 
-              {/* Price Summary */}
+              {/* Updated Price Summary */}
               <div className="space-y-2 mb-6">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-500 line-through">
-                    ₹{" "}
-                    {(hotelData.room.originalPrice * quantity).toLocaleString()}
+                    ₹ {formatPrice(totalOriginalPrice)}
                   </span>
-                  <span className="text-gray-500">Per Night:</span>
+
+                  <span className="text-gray-500">
+                    {quantity === 1 ? "Per Night" : `${quantity} Rooms`}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-green-600">
+                  <span className="font-medium">You save</span>
+
+                  <span className="font-medium">
+                    ₹ {formatPrice(totalDiscounts)}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-2xl font-bold">
-                  <span>₹ {grandTotal.toLocaleString()}</span>
+                  <span>₹ {formatPrice(grandTotal)}</span>
+
                   <span className="text-sm text-gray-500 font-normal">
-                    + ₹ {totalTaxes.toLocaleString()} taxes & fees
+                    + ₹ {formatPrice(totalTaxes)} taxes & fees
                   </span>
                 </div>
               </div>
@@ -569,7 +652,9 @@ const handleBooking = async (e: React.FormEvent) => {
                     <DialogHeader>
                       <DialogTitle>Login Required</DialogTitle>
                     </DialogHeader>
+
                     <p>Please log in to continue with your booking.</p>
+
                     <SignupDialog
                       trigger={
                         <Button className="w-full">Log In / Sign Up</Button>
@@ -586,10 +671,10 @@ const handleBooking = async (e: React.FormEvent) => {
                 14 More Options
               </button>
             </div>
-            </div>
           </div>
         </div>
       </div>
+    </div>
   );
 };
 
