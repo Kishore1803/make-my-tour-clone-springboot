@@ -1,5 +1,8 @@
 "use client";
+import { useRouter } from "next/router";
 import PageHeader from "@/components/CancellationRefund/PageHearder";
+
+const router = useRouter();
 
 const policies = [
   {
@@ -215,19 +218,19 @@ export default function CancellationPolicyPage() {
 
         {/* Navigation Buttons */}
         <div className="mt-8 flex flex-wrap gap-3">
-          <a
-            href="/cancellation"
+          <button
+            onClick={() => router.push("/manage-cancellation")}
             className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
           >
             Manage Cancellations
-          </a>
+          </button>
 
-          <a
-            href="/refunds"
+          <button
+            onClick={() => router.push("/manage-cancellation")}
             className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
           >
             Track My Refunds
-          </a>
+          </button>
         </div>
       </div>
     </main>
