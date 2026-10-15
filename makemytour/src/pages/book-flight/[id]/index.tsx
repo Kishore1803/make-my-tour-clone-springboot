@@ -197,7 +197,7 @@ const BookFlightPage = () => {
   const { id } = router.query;
   const dispatch = useDispatch();
 
-  const user = useSelector((state: any) => state.user.user) as User | null
+  const user = useSelector((state: any) => state.user.user) as User | null;
   const [flight, setFlight] = useState<Flight | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSeat, setSelectedSeat] = useState<any | null>(null);
@@ -347,27 +347,28 @@ const BookFlightPage = () => {
     }
 
     const response = await freezePrice("FLIGHT", flight.id, user.id);
-
+    console.log("PRICE FREEZE RESPONSE:", response);
     const value = Number(response?.lockedPrice ?? response?.price);
 
-    if (!Number.isFinite(value) || value < 0) {
-      throw new Error("The freeze API did not return a valid lockedPrice.");
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new Error(
+        `Invalid frozen price. Backend response: ${JSON.stringify(response)}`,
+      );
     }
 
     if (response?.status && response.status !== "ACTIVE") {
-      throw new Error("The returned price freeze is not active.");
+      throw new Error(`Price freeze is not active: ${response.status}`);
     }
 
-    if (response?.expiresAt) {
-      const expiry = new Date(response.expiresAt).getTime();
-
-      if (!Number.isFinite(expiry) || expiry <= Date.now()) {
-        throw new Error("The frozen price has expired.");
-      }
-
-      setFreezeExpiresAt(response.expiresAt);
-    } else {
+    if (!response?.expiresAt) {
+      console.warn("Price freeze response has no expiresAt field.");
       setFreezeExpiresAt(null);
+    } else {
+      const expiry = new Date(response.expiresAt).getTime();
+      if (!Number.isFinite(expiry) || expiry <= Date.now()) {
+        throw new Error("Price freeze expired. Please try again.");
+      }
+      setFreezeExpiresAt(response.expiresAt);
     }
 
     setLockedPrice(value);
@@ -412,6 +413,14 @@ const BookFlightPage = () => {
           throw new Error("Price freeze expired. Please try again.");
         }
       }
+
+      console.log("FLIGHT BOOKING REQUEST:", {
+        userId: user.id,
+        flightId: flight.id,
+        seats: quantity,
+        price: priceToBook,
+        selectedSeat: String(selectedSeat.seatNumber),
+      });
 
       const bookingData = await handleflightbooking(
         user.id,
