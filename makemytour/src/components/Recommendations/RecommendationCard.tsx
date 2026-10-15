@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ThumbsUp, ThumbsDown, Info, MapPin } from "lucide-react";
 import type { Recommendation } from "@/api/recommendationApi";
 
+import { useRouter } from "next/navigation";
+
 type Props = {
   item: Recommendation;
   onFeedback: (itemId: number, helpful: boolean) => Promise<void>;
@@ -26,6 +28,8 @@ export default function RecommendationCard({
       setSubmitting(false);
     }
   };
+
+  const router = useRouter();
 
   return (
     <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -85,7 +89,7 @@ export default function RecommendationCard({
 
         <button
           type="button"
-          onClick={() => onSelect(item)}
+          onClick={() => router.push("/explore")}
           className="mt-4 w-full rounded-lg bg-red-600 px-4 py-2.5 font-semibold text-white hover:bg-red-700"
         >
           Explore
