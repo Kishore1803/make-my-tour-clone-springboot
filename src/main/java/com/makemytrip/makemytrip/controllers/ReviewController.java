@@ -15,7 +15,7 @@ import java.util.List;
 @RequestMapping("/api/reviews")
 public class ReviewController {
 
-	@Autowired
+    @Autowired
     private ReviewService reviewService;
 
     // CREATE REVIEW
@@ -27,18 +27,20 @@ public class ReviewController {
 
     // GET REVIEWS
     @GetMapping("/item/{itemId}")
-    public ResponseEntity<List<ReviewResponse>> getReviews(@PathVariable Long itemId, @RequestParam String itemType, @RequestParam(defaultValue = "newest") String sort) {
+    public ResponseEntity<List<ReviewResponse>> getReviews(@PathVariable Long itemId, @RequestParam String itemType,
+            @RequestParam(defaultValue = "newest") String sort) {
         List<ReviewResponse> reviews = reviewService.getReviews(itemId, itemType, sort);
         return ResponseEntity.ok(reviews);
     }
-    
+
     // UPDATE REVIEW
     @PutMapping("/{reviewId}")
-    public ResponseEntity<ReviewResponse> updateReview(@PathVariable Long reviewId, @RequestBody ReviewRequest request) {
+    public ResponseEntity<ReviewResponse> updateReview(@PathVariable Long reviewId,
+            @RequestBody ReviewRequest request) {
         ReviewResponse response = reviewService.updateReview(reviewId, request);
         return ResponseEntity.ok(response);
     }
-    
+
     // DELETE REVIEW
     @DeleteMapping("/{reviewId}")
     public ResponseEntity<String> deleteReview(@PathVariable Long reviewId) {

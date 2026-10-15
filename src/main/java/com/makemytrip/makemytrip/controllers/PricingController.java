@@ -14,12 +14,13 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/pricing")
 public class PricingController {
-	
-	@Autowired
+
+    @Autowired
     private PricingService pricingService;
 
     @GetMapping("/{type}/{itemId}")
-    public ResponseEntity<PriceResponse> getCurrentPrice(@PathVariable String type, @PathVariable Long itemId, @RequestParam(required = false) Long userId) {
+    public ResponseEntity<PriceResponse> getCurrentPrice(@PathVariable String type, @PathVariable Long itemId,
+            @RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(pricingService.getCurrentPrice(type, itemId, userId));
     }
 
@@ -29,7 +30,8 @@ public class PricingController {
     }
 
     @PostMapping("/{type}/{itemId}/freeze")
-    public ResponseEntity<FreezeResponse> freezePrice(@PathVariable String type, @PathVariable Long itemId, @RequestBody FreezeRequest request) {
+    public ResponseEntity<FreezeResponse> freezePrice(@PathVariable String type, @PathVariable Long itemId,
+            @RequestBody FreezeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(pricingService.freezePrice(type, itemId, request.userId()));
     }
@@ -41,7 +43,8 @@ public class PricingController {
 
     // Protect this endpoint with admin authentication before production use.
     @PutMapping("/admin/{type}/{itemId}")
-    public ResponseEntity<PriceResponse> updatePricing(@PathVariable String type, @PathVariable Long itemId, @RequestBody AdminUpdateRequest request) {
+    public ResponseEntity<PriceResponse> updatePricing(@PathVariable String type, @PathVariable Long itemId,
+            @RequestBody AdminUpdateRequest request) {
         return ResponseEntity.ok(pricingService.updatePricing(type, itemId, request));
     }
 
@@ -49,7 +52,8 @@ public class PricingController {
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException ex) {
         String message = ex.getMessage() == null ? "Invalid request" : ex.getMessage();
         HttpStatus status = message.toLowerCase().contains("not found")
-                ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+                ? HttpStatus.NOT_FOUND
+                : HttpStatus.BAD_REQUEST;
         return ResponseEntity.status(status).body(Map.of("message", message));
     }
 }

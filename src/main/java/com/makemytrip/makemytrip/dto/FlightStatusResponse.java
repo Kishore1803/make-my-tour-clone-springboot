@@ -34,31 +34,31 @@ public class FlightStatusResponse {
 
     public FlightStatusResponse() {
     }
-   
-	public FlightStatusResponse(Long id, String flightNumber, String airline, String fromCity, String toCity,
-			String departureDate, String scheduledDeparture, String revisedDeparture, String scheduledArrival,
-			String estimatedArrival, String status, Integer delayMinutes, String delayReason, String terminal,
-			String gate, Integer progress, LocalDateTime lastUpdated) {
-		this.id = id;
-		this.flightNumber = flightNumber;
-		this.airline = airline;
-		this.fromCity = fromCity;
-		this.toCity = toCity;
-		this.departureDate = departureDate;
-		this.scheduledDeparture = scheduledDeparture;
-		this.revisedDeparture = revisedDeparture;
-		this.scheduledArrival = scheduledArrival;
-		this.estimatedArrival = estimatedArrival;
-		this.status = status;
-		this.delayMinutes = delayMinutes;
-		this.delayReason = delayReason;
-		this.terminal = terminal;
-		this.gate = gate;
-		this.progress = progress;
-		this.lastUpdated = lastUpdated;
-	}
 
-	public Long getId() {
+    public FlightStatusResponse(Long id, String flightNumber, String airline, String fromCity, String toCity,
+            String departureDate, String scheduledDeparture, String revisedDeparture, String scheduledArrival,
+            String estimatedArrival, String status, Integer delayMinutes, String delayReason, String terminal,
+            String gate, Integer progress, LocalDateTime lastUpdated) {
+        this.id = id;
+        this.flightNumber = flightNumber;
+        this.airline = airline;
+        this.fromCity = fromCity;
+        this.toCity = toCity;
+        this.departureDate = departureDate;
+        this.scheduledDeparture = scheduledDeparture;
+        this.revisedDeparture = revisedDeparture;
+        this.scheduledArrival = scheduledArrival;
+        this.estimatedArrival = estimatedArrival;
+        this.status = status;
+        this.delayMinutes = delayMinutes;
+        this.delayReason = delayReason;
+        this.terminal = terminal;
+        this.gate = gate;
+        this.progress = progress;
+        this.lastUpdated = lastUpdated;
+    }
+
+    public Long getId() {
         return id;
     }
 

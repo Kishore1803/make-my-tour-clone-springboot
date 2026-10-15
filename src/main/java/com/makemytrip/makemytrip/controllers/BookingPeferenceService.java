@@ -29,7 +29,8 @@ public class BookingPeferenceService {
 
     // Save or update preference
     @PostMapping("/save")
-    public BookingPreference savePreference(@RequestParam Long userId, @RequestParam String preferenceType, @RequestParam String preferenceValue) {
+    public BookingPreference savePreference(@RequestParam Long userId, @RequestParam String preferenceType,
+            @RequestParam String preferenceValue) {
         return preferenceService.savePreference(userId, preferenceType, preferenceValue);
     }
 

@@ -16,11 +16,12 @@ import java.util.Map;
 @RequestMapping("/api/recommendations")
 public class RecommendationController {
 
-	@Autowired
+    @Autowired
     private RecommendationService service;
 
     @GetMapping("/{userId}")
-    public ResponseEntity<List<RecommendationResponse>> getRecommendations(@PathVariable Long userId, @RequestParam(required = false) String type) {
+    public ResponseEntity<List<RecommendationResponse>> getRecommendations(@PathVariable Long userId,
+            @RequestParam(required = false) String type) {
         return ResponseEntity.ok(service.recommend(userId, type));
     }
 
@@ -31,7 +32,8 @@ public class RecommendationController {
     }
 
     @PostMapping("/{userId}/{itemId}/interaction")
-    public ResponseEntity<TravelInteraction> recordInteraction(@PathVariable Long userId, @PathVariable Long itemId, @RequestParam String action) {
+    public ResponseEntity<TravelInteraction> recordInteraction(@PathVariable Long userId, @PathVariable Long itemId,
+            @RequestParam String action) {
         return ResponseEntity.ok(service.recordInteraction(userId, itemId, action));
     }
 }

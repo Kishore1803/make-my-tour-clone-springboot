@@ -6,7 +6,8 @@ public class PushSubscriptionRequest {
     private String p256dh;
     private String auth;
 
-    public PushSubscriptionRequest() {}
+    public PushSubscriptionRequest() {
+    }
 
     public String getEndpoint() {
         return endpoint;

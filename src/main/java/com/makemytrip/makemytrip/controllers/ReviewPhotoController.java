@@ -14,12 +14,13 @@ import java.util.List;
 @RequestMapping("/api/review-photos")
 public class ReviewPhotoController {
 
-	@Autowired
+    @Autowired
     private ReviewPhotoService photoService;
 
     // Upload Photo
     @PostMapping("/upload")
-    public ResponseEntity<ReviewPhoto> uploadPhoto(@RequestParam Long reviewId, @RequestParam Long userId, @RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ReviewPhoto> uploadPhoto(@RequestParam Long reviewId, @RequestParam Long userId,
+            @RequestParam("file") MultipartFile file) {
         ReviewPhoto photo = photoService.uploadPhoto(reviewId, userId, file);
         return ResponseEntity.ok(photo);
     }

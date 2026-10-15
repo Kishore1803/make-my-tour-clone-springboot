@@ -13,7 +13,7 @@ import java.util.Map;
 @RequestMapping("/api/push")
 public class PushSubscriptionController {
 
-	@Autowired
+    @Autowired
     private WebPushService webPushService;
 
     @PostMapping("/subscribe")

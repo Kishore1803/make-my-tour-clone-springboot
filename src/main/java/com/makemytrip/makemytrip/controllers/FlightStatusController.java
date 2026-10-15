@@ -12,17 +12,16 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/flight-status")
-@CrossOrigin("*")
 public class FlightStatusController {
 
-	@Autowired
+    @Autowired
     private FlightStatusService flightStatusService;
-	
-	@PostMapping
-	public ResponseEntity<FlightStatusResponse> createFlight(@RequestBody FlightStatus flightStatus) {
-	    FlightStatusResponse response = flightStatusService.createFlight(flightStatus);
-	    return ResponseEntity.ok(response);
-	}
+
+    @PostMapping
+    public ResponseEntity<FlightStatusResponse> createFlight(@RequestBody FlightStatus flightStatus) {
+        FlightStatusResponse response = flightStatusService.createFlight(flightStatus);
+        return ResponseEntity.ok(response);
+    }
 
     // GET ALL FLIGHTS
     @GetMapping
@@ -38,8 +37,9 @@ public class FlightStatusController {
 
     // SEARCH FLIGHTS
     @GetMapping("/search")
-    public ResponseEntity<List<FlightStatusResponse>> searchFlights(@RequestParam String from, @RequestParam String to) {
-    	return ResponseEntity.ok(flightStatusService.searchFlights(from, to));
+    public ResponseEntity<List<FlightStatusResponse>> searchFlights(@RequestParam String from,
+            @RequestParam String to) {
+        return ResponseEntity.ok(flightStatusService.searchFlights(from, to));
     }
 
     // GET FLIGHTS BY STATUS

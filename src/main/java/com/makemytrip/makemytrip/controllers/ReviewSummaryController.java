@@ -12,7 +12,7 @@ import java.util.Map;
 @RequestMapping("/api/reviews")
 public class ReviewSummaryController {
 
-	@Autowired
+    @Autowired
     private ReviewSummaryService reviewSummaryService;
 
     // GET REVIEW SUMMARY

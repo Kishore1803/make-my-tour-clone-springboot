@@ -12,5 +12,5 @@ public record RecommendationResponse(
     String imageUrl,
     BigDecimal price,
     double score,
-    String reason
-) {}
+    String reason) {
+}

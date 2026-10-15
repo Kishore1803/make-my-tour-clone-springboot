@@ -14,12 +14,13 @@ import java.util.List;
 @RequestMapping("/api/review-flags")
 public class ReviewFlagController {
 
-	@Autowired
+    @Autowired
     private ReviewFlagService flagService;
 
     // REPORT REVIEW
     @PostMapping
-    public ResponseEntity<ReviewFlag> createFlag(@RequestParam Long reviewId, @RequestParam Long userId, @RequestParam String reason) {
+    public ResponseEntity<ReviewFlag> createFlag(@RequestParam Long reviewId, @RequestParam Long userId,
+            @RequestParam String reason) {
         ReviewFlag flag = flagService.createFlag(reviewId, userId, reason);
         return ResponseEntity.status(HttpStatus.CREATED).body(flag);
     }

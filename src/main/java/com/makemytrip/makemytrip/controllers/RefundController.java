@@ -14,7 +14,7 @@ import com.makemytrip.makemytrip.services.RefundService;
 @RequestMapping("/refund")
 public class RefundController {
 
-	@Autowired
+    @Autowired
     private RefundService refundService;
 
     // Get refund by booking ID
@@ -37,7 +37,8 @@ public class RefundController {
 
     // Create refund only when explicitly required
     @PostMapping("/create")
-    public ResponseEntity<Refund> createRefund(@RequestParam Long userId, @RequestParam Long bookingId, @RequestParam String bookingType) {
+    public ResponseEntity<Refund> createRefund(@RequestParam Long userId, @RequestParam Long bookingId,
+            @RequestParam String bookingType) {
         return ResponseEntity.ok(refundService.createRefund(userId, bookingId, bookingType));
     }
 }

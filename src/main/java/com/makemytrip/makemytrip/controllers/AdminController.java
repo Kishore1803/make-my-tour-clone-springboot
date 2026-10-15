@@ -17,7 +17,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
-	
+
     @Autowired
     private UserRepository userRepository;
 
@@ -28,27 +28,27 @@ public class AdminController {
     private FlightRepository flightRepository;
 
     @GetMapping("/users")
-    public ResponseEntity<List<Users>> getallusers(){
+    public ResponseEntity<List<Users>> getallusers() {
         List<Users> users = userRepository.findAll();
         return ResponseEntity.ok(users);
     }
-    
+
     @PostMapping("/flight")
-    public Flight addflight(@RequestBody Flight flight){
+    public Flight addflight(@RequestBody Flight flight) {
         return flightRepository.save(flight);
     }
 
     @PostMapping("/hotel")
-    public Hotel addhotel(@RequestBody Hotel hotel){
+    public Hotel addhotel(@RequestBody Hotel hotel) {
         return hotelRepository.save(hotel);
     }
-    
+
     @PutMapping("flight/{id}")
-    public ResponseEntity<Flight> editflight(@PathVariable Long id, @RequestBody Flight updatedFlight){
-    	
+    public ResponseEntity<Flight> editflight(@PathVariable Long id, @RequestBody Flight updatedFlight) {
+
         Optional<Flight> flightOptional = flightRepository.findById(id);
-        
-        if(flightOptional.isPresent()){
+
+        if (flightOptional.isPresent()) {
             Flight flight = flightOptional.get();
             flight.setFlightName(updatedFlight.getFlightName());
             flight.setFrom(updatedFlight.getFrom());
@@ -58,18 +58,18 @@ public class AdminController {
             flight.setPrice(updatedFlight.getPrice());
             flight.setAvailableSeats(updatedFlight.getAvailableSeats());
             flightRepository.save(flight);
-            return  ResponseEntity.ok(flight);
+            return ResponseEntity.ok(flight);
         }
-        
+
         return ResponseEntity.notFound().build();
     }
-    
+
     @PutMapping("hotel/{id}")
-    public ResponseEntity<Hotel> editHotel (@PathVariable Long id, @RequestBody Hotel updatedHotel){
-    	
+    public ResponseEntity<Hotel> editHotel(@PathVariable Long id, @RequestBody Hotel updatedHotel) {
+
         Optional<Hotel> hotelOptional = hotelRepository.findById(id);
-        
-        if(hotelOptional.isPresent()){
+
+        if (hotelOptional.isPresent()) {
             Hotel hotel = hotelOptional.get();
             hotel.sethotelName(updatedHotel.gethotelName());
             hotel.setLocation(updatedHotel.getLocation());
@@ -79,7 +79,7 @@ public class AdminController {
             hotelRepository.save(hotel);
             return ResponseEntity.ok(hotel);
         }
-        
+
         return ResponseEntity.notFound().build();
     }
 }

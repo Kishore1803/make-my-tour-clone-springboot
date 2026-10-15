@@ -4,19 +4,19 @@ import java.time.LocalDateTime;
 
 public class ReviewResponse {
 
-    private Long id;
-    private Long userId;
-    private Long itemId;
-    private String itemType;
-    private Integer rating;
-    private String comment;
-    private String status;
-    private Integer helpfulCount;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+	private Long id;
+	private Long userId;
+	private Long itemId;
+	private String itemType;
+	private Integer rating;
+	private String comment;
+	private String status;
+	private Integer helpfulCount;
+	private LocalDateTime createdAt;
+	private LocalDateTime updatedAt;
 
-    public ReviewResponse() {
-    }
+	public ReviewResponse() {
+	}
 
 	public ReviewResponse(Long id, Long userId, Long itemId, String itemType, Integer rating, String comment,
 			String status, Integer helpfulCount, LocalDateTime createdAt, LocalDateTime updatedAt) {

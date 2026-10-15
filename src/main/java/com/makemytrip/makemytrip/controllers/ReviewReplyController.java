@@ -14,12 +14,13 @@ import java.util.List;
 @RequestMapping("/api/review-replies")
 public class ReviewReplyController {
 
-	@Autowired
+    @Autowired
     private ReviewReplyService replyService;
 
     // CREATE REPLY
     @PostMapping
-    public ResponseEntity<ReviewReply> createReply(@RequestParam Long reviewId, @RequestParam Long userId, @RequestParam String comment) {
+    public ResponseEntity<ReviewReply> createReply(@RequestParam Long reviewId, @RequestParam Long userId,
+            @RequestParam String comment) {
         ReviewReply reply = replyService.createReply(reviewId, userId, comment);
         return ResponseEntity.status(HttpStatus.CREATED).body(reply);
     }
@@ -33,7 +34,8 @@ public class ReviewReplyController {
 
     // UPDATE REPLY
     @PutMapping("/{replyId}")
-    public ResponseEntity<ReviewReply> updateReply(@PathVariable Long replyId, @RequestParam Long userId, @RequestParam String comment) {
+    public ResponseEntity<ReviewReply> updateReply(@PathVariable Long replyId, @RequestParam Long userId,
+            @RequestParam String comment) {
         ReviewReply updatedReply = replyService.updateReply(replyId, userId, comment);
         return ResponseEntity.ok(updatedReply);
     }
