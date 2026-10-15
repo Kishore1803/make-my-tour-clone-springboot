@@ -6,10 +6,7 @@ const BACKEND_URL =
 export const login = async (email, password) => {
   try {
     const res = await axios.post(`${BACKEND_URL}/user/login`, null, {
-      params: {
-        email,
-        password,
-      },
+      params: { email, password },
     });
 
     return res.data;

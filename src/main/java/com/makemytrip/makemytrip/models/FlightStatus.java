@@ -11,40 +11,40 @@ public class FlightStatus {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "flight_number", nullable = false)
     private String flightNumber;
 
     @Column(nullable = false)
     private String airline;
 
-    @Column(nullable = false)
+    @Column(name = "from_city", nullable = false)
     private String fromCity;
 
-    @Column(nullable = false)
+    @Column(name = "to_city", nullable = false)
     private String toCity;
 
-    @Column(nullable = false)
+    @Column(name = "departure_date", nullable = false)
     private String departureDate;
 
-    @Column(nullable = false)
+    @Column(name = "scheduled_departure", nullable = false)
     private String scheduledDeparture;
 
-    @Column(nullable = false)
+    @Column(name = "revised_departure", nullable = false)
     private String revisedDeparture;
 
-    @Column(nullable = false)
+    @Column(name = "scheduled_arrival", nullable = false)
     private String scheduledArrival;
 
-    @Column(nullable = false)
+    @Column(name = "estimated_arrival", nullable = false)
     private String estimatedArrival;
 
     @Column(nullable = false)
     private String status;
 
-    @Column(nullable = false)
+    @Column(name = "delay_minutes", nullable = false)
     private Integer delayMinutes = 0;
 
-    @Column(length = 500)
+    @Column(name = "delay_reason", length = 500)
     private String delayReason;
 
     private String terminal;
@@ -54,19 +54,32 @@ public class FlightStatus {
     @Column(nullable = false)
     private Integer progress = 0;
 
-    @Column(nullable = false)
+    @Column(name = "last_updated", nullable = false)
     private LocalDateTime lastUpdated;
-    
-    @Column(nullable = false)
+
+    @Column(name = "status_updated_at", nullable = false)
     private LocalDateTime statusUpdatedAt;
 
     public FlightStatus() {
     }
 
-    public FlightStatus(String flightNumber, String airline,String fromCity, String toCity, 
-    		String departureDate, String scheduledDeparture,String revisedDeparture, String scheduledArrival,
-            String estimatedArrival, String status, Integer delayMinutes, String delayReason,
-            String terminal, String gate, Integer progress) {
+    public FlightStatus(
+            String flightNumber,
+            String airline,
+            String fromCity,
+            String toCity,
+            String departureDate,
+            String scheduledDeparture,
+            String revisedDeparture,
+            String scheduledArrival,
+            String estimatedArrival,
+            String status,
+            Integer delayMinutes,
+            String delayReason,
+            String terminal,
+            String gate,
+            Integer progress) {
+
         this.flightNumber = flightNumber;
         this.airline = airline;
         this.fromCity = fromCity;
@@ -77,13 +90,39 @@ public class FlightStatus {
         this.scheduledArrival = scheduledArrival;
         this.estimatedArrival = estimatedArrival;
         this.status = status;
-        this.delayMinutes = delayMinutes;
+        this.delayMinutes = delayMinutes != null ? delayMinutes : 0;
         this.delayReason = delayReason;
         this.terminal = terminal;
         this.gate = gate;
-        this.progress = progress;
+        this.progress = progress != null ? progress : 0;
         this.lastUpdated = LocalDateTime.now();
         this.statusUpdatedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (lastUpdated == null) {
+            lastUpdated = now;
+        }
+
+        if (statusUpdatedAt == null) {
+            statusUpdatedAt = now;
+        }
+
+        if (delayMinutes == null) {
+            delayMinutes = 0;
+        }
+
+        if (progress == null) {
+            progress = 0;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        lastUpdated = LocalDateTime.now();
     }
 
     public Long getId() {
@@ -168,6 +207,7 @@ public class FlightStatus {
 
     public void setStatus(String status) {
         this.status = status;
+        this.statusUpdatedAt = LocalDateTime.now();
     }
 
     public Integer getDelayMinutes() {
@@ -217,20 +257,12 @@ public class FlightStatus {
     public void setLastUpdated(LocalDateTime lastUpdated) {
         this.lastUpdated = lastUpdated;
     }
-    
-    public LocalDateTime setStatusUpdatedAt() {
-		return statusUpdatedAt;
-	}
-    
+
+    public LocalDateTime getStatusUpdatedAt() {
+        return statusUpdatedAt;
+    }
+
     public void setStatusUpdatedAt(LocalDateTime statusUpdatedAt) {
         this.statusUpdatedAt = statusUpdatedAt;
     }
-    
-    public LocalDateTime getStatusUpdatedAt() {
-    			return statusUpdatedAt;
-    }
-
-	public void getStatusUpdatedAt(LocalDateTime statusUpdatedAt) {
-		this.statusUpdatedAt = statusUpdatedAt;
-	}
 }

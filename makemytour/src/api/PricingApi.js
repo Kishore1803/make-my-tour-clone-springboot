@@ -4,7 +4,6 @@ const API_BASE_URL = "https://make-my-tour-clone-springboot-backend.onrender.com
 
 const pricingApi = axios.create({
   baseURL: `${API_BASE_URL}/api/pricing`,
-  timeout: 15000,
 });
 
 // Get current dynamic price
