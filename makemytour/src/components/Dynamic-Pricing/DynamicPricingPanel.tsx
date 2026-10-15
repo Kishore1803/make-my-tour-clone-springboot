@@ -3,7 +3,8 @@ import {
   freezePrice,
   getCurrentPrice,
   getPriceHistory,
-} from "@/api/pricingApi";
+} from "@/api/PricingApi";
+
 import type {
   ItemType,
   PriceHistoryPoint,
