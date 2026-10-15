@@ -1,8 +1,8 @@
+
 package com.makemytrip.makemytrip.services;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -13,10 +13,13 @@ import com.makemytrip.makemytrip.models.Users.Booking;
 import com.makemytrip.makemytrip.models.Flight;
 import com.makemytrip.makemytrip.models.Hotel;
 import com.makemytrip.makemytrip.models.Seat;
+import com.makemytrip.makemytrip.models.PriceFreeze;
+
 import com.makemytrip.makemytrip.repositories.UserRepository;
 import com.makemytrip.makemytrip.repositories.FlightRepository;
 import com.makemytrip.makemytrip.repositories.HotelRepository;
 import com.makemytrip.makemytrip.repositories.SeatRepository;
+import com.makemytrip.makemytrip.repositories.PriceFreezeRepository;
 
 @Service
 public class BookingService {
@@ -32,6 +35,10 @@ public class BookingService {
 
     @Autowired
     private SeatRepository seatRepository;
+
+    // Price freeze repository added here
+    @Autowired
+    private PriceFreezeRepository priceFreezeRepository;
 
     @Transactional
     public Booking bookFlight(Long userId, Long flightId, int seats, double price, String selectedSeat) {
@@ -58,6 +65,25 @@ public class BookingService {
         Flight flight = flightRepository.findById(flightId)
                 .orElseThrow(() -> new IllegalArgumentException("Flight not found: " + flightId));
 
+        // PRICE FREEZE VALIDATION STARTS HERE
+        PriceFreeze freeze = priceFreezeRepository
+                .findFirstByUserIdAndItemTypeAndItemIdAndStatusOrderByExpiresAtDesc(userId, "FLIGHT", flightId, "ACTIVE")
+                .orElseThrow(() ->
+                        new IllegalStateException("No active price freeze found. Please refresh the price."));
+
+        if (freeze.getExpiresAt() == null ||
+                !freeze.getExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("Price freeze expired. Please refresh the price.");
+        }
+
+        // Assumes PriceFreeze.getLockedPrice() returns BigDecimal
+        double lockedPrice = freeze.getLockedPrice().doubleValue();
+
+        if (Math.abs(price - lockedPrice) > 0.01) {
+            throw new IllegalArgumentException("Price mismatch. Locked price is " + lockedPrice);
+        }
+        // PRICE FREEZE VALIDATION ENDS HERE
+
         Seat seat = seatRepository
                 .findByFlightIdAndSeatNumber(flightId, selectedSeat)
                 .orElseThrow(() -> new IllegalArgumentException("Selected seat not found."));
@@ -79,17 +105,13 @@ public class BookingService {
         booking.setDate(LocalDate.now().toString());
         booking.setBookedAt(LocalDateTime.now().toString());
         booking.setQuantity(1);
-        booking.setTotalPrice(price);
+        booking.setTotalPrice(lockedPrice);
         booking.setSelectedSeat(selectedSeat);
         booking.setCancellationStatus("BOOKED");
         booking.setRefundAmount(0.0);
         booking.setRefundStatus("NOT_APPLICABLE");
-
-        if (user.getBookings() == null) {
-            throw new IllegalStateException("User bookings collection is not initialized.");
-        }
-
         user.getBookings().add(booking);
+
         flightRepository.save(flight);
         seatRepository.save(seat);
         userRepository.save(user);
@@ -115,19 +137,16 @@ public class BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
         Hotel hotel = hotelRepository.findById(hotelId)
-                .orElseThrow(() -> new IllegalArgumentException("Hotel not found: " + hotelId));
+                .orElseThrow(() ->  new IllegalArgumentException("Hotel not found: " + hotelId));
 
         if (hotel.getAvailableRooms() < rooms) {
             throw new IllegalStateException("Not enough rooms available.");
         }
 
-        // Update hotel availability.
         hotel.setAvailableRooms(hotel.getAvailableRooms() - rooms);
 
-        // Create booking.
         Booking booking = new Booking();
         booking.setType("HOTEL");
-
         booking.setBookingId(hotelId);
         booking.setDate(LocalDate.now().toString());
         booking.setBookedAt(LocalDateTime.now().toString());
@@ -136,15 +155,11 @@ public class BookingService {
         booking.setCancellationStatus("BOOKED");
         booking.setRefundAmount(0.0);
         booking.setRefundStatus("NOT_APPLICABLE");
+
         user.getBookings().add(booking);
 
         hotelRepository.save(hotel);
         userRepository.save(user);
-
-        System.out.println("Hotel booking saved.");
-        System.out.println("User ID: " + userId);
-        System.out.println("Hotel ID: " + hotelId);
-        System.out.println("Booking type: " + booking.getType());
 
         return booking;
     }
