@@ -3,23 +3,31 @@ import axios from "axios";
 const BACKEND_URL =
   "https://make-my-tour-clone-springboot-backend.onrender.com";
 
+const API = axios.create({ baseURL: BACKEND_URL, timeout: 60000 });
+
+// COMMON ERROR HANDLER
+const handleApiError = (operation, error) => {
+  console.error(
+    `${operation} failed:`,
+    error.response?.status,
+    error.response?.data || error.message,
+  );
+  throw error;
+};
+
+// USER LOGIN
 export const login = async (email, password) => {
   try {
-    const res = await axios.post(`${BACKEND_URL}/user/login`, null, {
+    const response = await API.post("/user/login", null, {
       params: { email, password },
     });
-
-    return res.data;
+    return response.data;
   } catch (error) {
-    console.error(
-      "Login failed:",
-      error.response?.status,
-      error.response?.data || error.message,
-    );
-    throw error;
+    handleApiError("Login", error);
   }
 };
 
+// USER SIGNUP
 export const signup = async (
   firstName,
   lastName,
@@ -28,30 +36,32 @@ export const signup = async (
   password,
 ) => {
   try {
-    const res = await axios.post(`${BACKEND_URL}/user/signup`, {
+    const response = await API.post("/user/signup", {
       firstName,
       lastName,
       email,
       phoneNumber,
       password,
     });
-    const data = res.data;
-    return data;
+    return response.data;
   } catch (error) {
-    throw error;
+    handleApiError("Signup", error);
   }
 };
 
+// GET USER BY EMAIL
 export const getuserbyemail = async (email) => {
   try {
-    const res = await axios.get(`${BACKEND_URL}/user/email?email=${email}`);
-    const data = res.data;
-    return data;
+    const response = await API.get("/user/email", {
+      params: { email },
+    });
+    return response.data;
   } catch (error) {
-    throw error;
+    handleApiError("Get user by email", error);
   }
 };
 
+// EDIT USER PROFILE
 export const editprofile = async (
   id,
   firstName,
@@ -60,30 +70,31 @@ export const editprofile = async (
   phoneNumber,
 ) => {
   try {
-    const res = await axios.post(`${BACKEND_URL}/user/edit?id=${id}`, {
-      firstName,
-      lastName,
-      email,
-      phoneNumber,
-    });
-    const data = res.data;
-    return data;
+    const response = await API.post(
+      "/user/edit",
+      {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+      },
+      {
+        params: { id },
+      },
+    );
+    return response.data;
   } catch (error) {
-    throw error;
+    handleApiError("Edit profile", error);
   }
 };
 
+// FLIGHT APIs
 export const getflight = async () => {
   try {
-    const res = await axios.get(`${BACKEND_URL}/flight`);
-    return res.data;
+    const response = await API.get("/flight");
+    return response.data;
   } catch (error) {
-    console.error(
-      "Get flights failed:",
-      error.response?.status,
-      error.response?.data || error.message,
-    );
-    throw error;
+    handleApiError("Get flights", error);
   }
 };
 
@@ -97,7 +108,7 @@ export const addflight = async (
   availableSeats,
 ) => {
   try {
-    const res = await axios.post(`${BACKEND_URL}/admin/flight`, {
+    const response = await API.post("/admin/flight", {
       flightName,
       from,
       to,
@@ -106,10 +117,9 @@ export const addflight = async (
       price,
       availableSeats,
     });
-    const data = res.data;
-    return data;
+    return response.data;
   } catch (error) {
-    console.log(error);
+    handleApiError("Add flight", error);
   }
 };
 
@@ -124,7 +134,7 @@ export const editflight = async (
   availableSeats,
 ) => {
   try {
-    const res = await axios.put(`${BACKEND_URL}/admin/flight/${id}`, {
+    const response = await API.put(`/admin/flight/${id}`, {
       flightName,
       from,
       to,
@@ -133,20 +143,19 @@ export const editflight = async (
       price,
       availableSeats,
     });
-    const data = res.data;
-    return data;
+    return response.data;
   } catch (error) {
-    console.log(error);
+    handleApiError("Edit flight", error);
   }
 };
 
+// HOTEL APIs
 export const gethotel = async () => {
   try {
-    const res = await axios.get(`${BACKEND_URL}/hotel`);
-    const data = res.data;
-    return data;
+    const response = await API.get("/hotel");
+    return response.data;
   } catch (error) {
-    console.log(data);
+    handleApiError("Get hotels", error);
   }
 };
 
@@ -158,17 +167,16 @@ export const addhotel = async (
   amenities,
 ) => {
   try {
-    const res = await axios.post(`${BACKEND_URL}/admin/hotel`, {
+    const response = await API.post("/admin/hotel", {
       hotelName,
       location,
       pricePerNight,
       availableRooms,
       amenities,
     });
-    const data = res.data;
-    return data;
+    return response.data;
   } catch (error) {
-    console.log(error);
+    handleApiError("Add hotel", error);
   }
 };
 
@@ -181,20 +189,20 @@ export const edithotel = async (
   amenities,
 ) => {
   try {
-    const res = await axios.put(`${BACKEND_URL}/admin/hotel/${id}`, {
+    const response = await API.put(`/admin/hotel/${id}`, {
       hotelName,
       location,
       pricePerNight,
       availableRooms,
       amenities,
     });
-    const data = res.data;
-    return data;
+    return response.data;
   } catch (error) {
-    console.log(error);
+    handleApiError("Edit hotel", error);
   }
 };
 
+// FLIGHT BOOKING
 export const handleflightbooking = async (
   userId,
   flightId,
@@ -203,33 +211,36 @@ export const handleflightbooking = async (
   selectedSeat,
 ) => {
   try {
-    const res = await axios.post(`${BACKEND_URL}/booking/flight`, null, {
-      params: { userId, flightId, seats, price, selectedSeat },
+    const response = await API.post("/booking/flight", null, {
+      params: {
+        userId: Number(userId),
+        flightId: Number(flightId),
+        seats: Number(seats),
+        price: Number(price),
+        selectedSeat,
+      },
     });
-
-    return res.data;
-  } catch (error) {
-    console.error(
-      "Flight booking failed:",
-      error.response?.status,
-      error.response?.data || error.message,
-    );
-    throw error;
-  }
-};
-
-export const handlehotelbooking = async (userId, hotelId, rooms, price) => {
-  try {
-    const response = await axios.post(`${BACKEND_URL}/booking/hotel`, null, {
-      params: { userId, hotelId, rooms, price },
-    });
-    console.log("Hotel booking response:", response.data);
     return response.data;
   } catch (error) {
-    console.error(
-      "Hotel booking failed:",
-      error.response?.data || error.message,
-    );
-    throw error;
+    handleApiError("Flight booking", error);
   }
 };
+
+// HOTEL BOOKING
+export const handlehotelbooking = async (userId, hotelId, rooms, price) => {
+  try {
+    const response = await API.post("/booking/hotel", null, {
+      params: {
+        userId: Number(userId),
+        hotelId: Number(hotelId),
+        rooms: Number(rooms),
+        price: Number(price),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    handleApiError("Hotel booking", error);
+  }
+};
+
+export default API;
