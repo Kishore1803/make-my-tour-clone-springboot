@@ -1,4 +1,3 @@
-
 package com.makemytrip.makemytrip.services;
 
 import java.math.BigDecimal;
@@ -23,7 +22,7 @@ import com.makemytrip.makemytrip.repositories.PricingItemRepository;
 @Service
 public class PricingService {
 
-    private static final int FREEZE_MINUTES = 30;
+    private static final int FREEZE_MINUTES = 10080;
     private static final BigDecimal MIN_RATE = new BigDecimal("-0.50");
     private static final BigDecimal MAX_RATE = new BigDecimal("1.00");
     private static final BigDecimal HOLIDAY_RATE = new BigDecimal("0.20");
