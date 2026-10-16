@@ -64,15 +64,42 @@ public class PriceHistory {
 
         if (recordedAt == null) recordedAt = now;
         if (createdAt == null) createdAt = now;
-        if (changePercentage == null) {
-            changePercentage = BigDecimal.ZERO;
+        if (changePercentage == null) { 
+        	changePercentage = BigDecimal.ZERO;
         }
+        
         if (holiday == null) {
             holiday = false;
         }
     }
+    
+    public PriceHistory() {
+    	
+    }
+    
+	public PriceHistory(Long id, String itemType, Long itemId, BigDecimal dynamicPrice, BigDecimal basePrice,
+			BigDecimal finalPrice, BigDecimal changePercentage, BigDecimal demandAdjustment,
+			BigDecimal seasonalAdjustment, Boolean holiday, Long flightId, Long hotelId, String reason,
+			LocalDateTime recordedAt, LocalDateTime createdAt) {
+		super();
+		this.id = id;
+		this.itemType = itemType;
+		this.itemId = itemId;
+		this.dynamicPrice = dynamicPrice;
+		this.basePrice = basePrice;
+		this.finalPrice = finalPrice;
+		this.changePercentage = changePercentage;
+		this.demandAdjustment = demandAdjustment;
+		this.seasonalAdjustment = seasonalAdjustment;
+		this.holiday = holiday;
+		this.flightId = flightId;
+		this.hotelId = hotelId;
+		this.reason = reason;
+		this.recordedAt = recordedAt;
+		this.createdAt = createdAt;
+	}
 
-    public Long getId() { 
+	public Long getId() { 
     	return id;
     }
 

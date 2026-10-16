@@ -2,10 +2,8 @@ import axios from "axios";
 
 const API_BASE_URL =
   "https://make-my-tour-clone-springboot-backend.onrender.com";
-
-const pricingApi = axios.create({
-  baseURL: `${API_BASE_URL}/api/pricing`,
-});
+  
+const pricingApi = axios.create({ baseURL: `${API_BASE_URL}/api/pricing` });
 
 // Get current dynamic price
 export const getCurrentPrice = async (type, itemId, userId) => {

@@ -36,7 +36,6 @@ public class BookingService {
     @Autowired
     private SeatRepository seatRepository;
 
-    // Price freeze repository added here
     @Autowired
     private PriceFreezeRepository priceFreezeRepository;
 
@@ -65,25 +64,41 @@ public class BookingService {
         Flight flight = flightRepository.findById(flightId)
                 .orElseThrow(() -> new IllegalArgumentException("Flight not found: " + flightId));
 
-        // PRICE FREEZE VALIDATION STARTS HERE
+        // PRICE FREEZE VALIDATION
+        LocalDateTime now = LocalDateTime.now();
+
         PriceFreeze freeze = priceFreezeRepository
                 .findFirstByUserIdAndItemTypeAndItemIdAndStatusOrderByExpiresAtDesc(userId, "FLIGHT", flightId, "ACTIVE")
-                .orElseThrow(() ->
-                        new IllegalStateException("No active price freeze found. Please refresh the price."));
+                .orElseThrow(() -> new IllegalStateException("No active price freeze found. Please refresh the price."));
 
-        if (freeze.getExpiresAt() == null ||
-                !freeze.getExpiresAt().isAfter(LocalDateTime.now())) {
+        System.out.println("=== PRICE FREEZE DEBUG ===");
+        System.out.println("User ID: " + userId);
+        System.out.println("Flight ID: " + flightId);
+        System.out.println("Freeze ID: " + freeze.getId());
+        System.out.println("Status: " + freeze.getStatus());
+        System.out.println("Expires At: " + freeze.getExpiresAt());
+        System.out.println("Server Time: " + now);
+        System.out.println("==========================");
+
+        if (freeze.getExpiresAt() == null) {
+            throw new IllegalStateException("Price freeze has no expiry time. Please refresh the price.");
+        }
+
+        if (!freeze.getExpiresAt().isAfter(now)) {
             throw new IllegalStateException("Price freeze expired. Please refresh the price.");
         }
 
-        // Assumes PriceFreeze.getLockedPrice() returns BigDecimal
+        if (freeze.getLockedPrice() == null) {
+            throw new IllegalStateException("Frozen price is missing.");
+        }
+
         double lockedPrice = freeze.getLockedPrice().doubleValue();
 
         if (Math.abs(price - lockedPrice) > 0.01) {
             throw new IllegalArgumentException("Price mismatch. Locked price is " + lockedPrice);
-        }
-        // PRICE FREEZE VALIDATION ENDS HERE
+            }
 
+        // SEAT VALIDATION
         Seat seat = seatRepository
                 .findByFlightIdAndSeatNumber(flightId, selectedSeat)
                 .orElseThrow(() -> new IllegalArgumentException("Selected seat not found."));
@@ -96,9 +111,11 @@ public class BookingService {
             throw new IllegalStateException("No seats available.");
         }
 
+        // UPDATE INVENTORY
         flight.setAvailableSeats(flight.getAvailableSeats() - 1);
         seat.setAvailable(false);
 
+        // CREATE BOOKING
         Booking booking = new Booking();
         booking.setType("FLIGHT");
         booking.setBookingId(flightId);
@@ -137,7 +154,7 @@ public class BookingService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
 
         Hotel hotel = hotelRepository.findById(hotelId)
-                .orElseThrow(() ->  new IllegalArgumentException("Hotel not found: " + hotelId));
+                .orElseThrow(() -> new IllegalArgumentException("Hotel not found: " + hotelId));
 
         if (hotel.getAvailableRooms() < rooms) {
             throw new IllegalStateException("Not enough rooms available.");
