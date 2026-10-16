@@ -3,12 +3,12 @@ import axios from "axios";
 const API_BASE_URL =
   "https://make-my-tour-clone-springboot-backend.onrender.com";
 
-const pricingApi = axios.create({ baseURL: `${API_BASE_URL}/api/pricing` });
+const PricingApi = axios.create({ baseURL: `${API_BASE_URL}/api/pricing` });
 
 // Get current dynamic price
 export const getCurrentPrice = async (type, itemId, userId) => {
   try {
-    const response = await pricingApi.get(`/${type}/${itemId}`, {
+    const response = await PricingApi.get(`/${type}/${itemId}`, {
       params: userId ? { userId } : {},
     });
     return response.data;
@@ -25,7 +25,7 @@ export const getCurrentPrice = async (type, itemId, userId) => {
 // Get price history
 export const getPriceHistory = async (type, itemId) => {
   try {
-    const response = await pricingApi.get(`/${type}/${itemId}/history`);
+    const response = await PricingApi.get(`/${type}/${itemId}/history`);
     const data = response.data;
     return Array.isArray(data) ? data : (data?.history ?? []);
   } catch (error) {
@@ -41,7 +41,7 @@ export const getPriceHistory = async (type, itemId) => {
 // Freeze price for 30 minutes
 export const freezePrice = async (type, itemId, userId) => {
   try {
-    const response = await pricingApi.post(`/${type}/${itemId}/freeze`, {
+    const response = await PricingApi.post(`/${type}/${itemId}/freeze`, {
       userId: Number(userId),
     });
 
@@ -83,7 +83,7 @@ export const freezePrice = async (type, itemId, userId) => {
 // Get price freeze status by freeze ID
 export const getPriceFreeze = async (freezeId) => {
   try {
-    const response = await pricingApi.get(`/freezes/${freezeId}`);
+    const response = await PricingApi.get(`/freezes/${freezeId}`);
     return response.data;
   } catch (error) {
     console.error(
@@ -98,7 +98,7 @@ export const getPriceFreeze = async (freezeId) => {
 // Admin: update pricing configuration
 export const updatePricing = async (type, itemId, pricingData) => {
   try {
-    const response = await pricingApi.put(
+    const response = await PricingApi.put(
       `/admin/${type}/${itemId}`,
       pricingData,
     );
@@ -113,4 +113,4 @@ export const updatePricing = async (type, itemId, pricingData) => {
   }
 };
 
-export default pricingApi;
+export default PricingApi;
