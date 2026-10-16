@@ -99,34 +99,34 @@ public class BookingService {
     // HOTEL BOOKING
     @Transactional
     public Booking bookhotel(Long userId, Long hotelId, int rooms, double price) {
-
-        if (userId == null || hotelId == null) {
-            throw new IllegalArgumentException("User ID and hotel ID are required.");
+    	
+    	if (userId == null || hotelId == null) {
+    		throw new IllegalArgumentException( "User ID and hotel ID are required.");
         }
-
-        if (rooms <= 0) {
-            throw new IllegalArgumentException("Number of rooms must be greater than zero.");
+    	
+    	if (rooms <= 0) {
+    		throw new IllegalArgumentException("Number of rooms must be greater than zero.");
         }
-
-        if (!Double.isFinite(price) || price <= 0) {
-            throw new IllegalArgumentException("Invalid booking price.");
+    	
+    	if (!Double.isFinite(price) || price <= 0) {
+    		throw new IllegalArgumentException("Invalid booking price.");
         }
-
-        Users user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found."));
-
-        Hotel hotel = hotelRepository.findById(hotelId)
-                .orElseThrow(() -> new IllegalArgumentException("Hotel not found."));
-
-        if (hotel.getAvailableRooms() < rooms) {
-            throw new IllegalStateException("Not enough rooms available.");
+    	
+    	Users user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+    	
+    	Hotel hotel = hotelRepository.findById(hotelId)
+            .orElseThrow(() -> new IllegalArgumentException("Hotel not found: " + hotelId));
+    	
+    	if (hotel.getAvailableRooms() < rooms) {
+    		throw new IllegalStateException("Not enough rooms available.");
         }
-
-        // Update hotel inventory
-        hotel.setAvailableRooms(hotel.getAvailableRooms() - rooms);
-
-        // Save booking details
-        Booking booking = new Booking();
+    	
+    	if (user.getBookings() == null) {
+    		throw new IllegalStateException("User bookings collection is not initialized.");
+        }
+    	
+    	Booking booking = new Booking();
         booking.setType("HOTEL");
         booking.setBookingId(hotelId);
         booking.setDate(LocalDate.now().toString());
@@ -137,6 +137,7 @@ public class BookingService {
         booking.setRefundAmount(0.0);
         booking.setRefundStatus("NOT_APPLICABLE");
 
+        hotel.setAvailableRooms(hotel.getAvailableRooms() - rooms);
         user.getBookings().add(booking);
 
         hotelRepository.save(hotel);
