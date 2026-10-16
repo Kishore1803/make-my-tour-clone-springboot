@@ -1,300 +1,249 @@
-
 package com.makemytrip.makemytrip.services;
 
-import com.makemytrip.makemytrip.dto.PricingDtos.*;
-import com.makemytrip.makemytrip.models.*;
-import com.makemytrip.makemytrip.repositories.*;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.util.List;
+import com.makemytrip.makemytrip.models.PriceFreeze;
+import com.makemytrip.makemytrip.models.PricingItem;
+import com.makemytrip.makemytrip.repositories.PriceFreezeRepository;
+import com.makemytrip.makemytrip.repositories.PricingItemRepository;
 
 @Service
 public class PricingService {
 
-    private static final BigDecimal HOLIDAY_RATE = new BigDecimal("0.20");
-    private static final BigDecimal MIN_RATE = new BigDecimal("-0.50");
-    private static final BigDecimal MAX_RATE = BigDecimal.ONE;
     private static final int FREEZE_MINUTES = 30;
+    private static final BigDecimal MIN_RATE = new BigDecimal("-0.50");
+    private static final BigDecimal MAX_RATE = new BigDecimal("1.00");
+    private static final BigDecimal HOLIDAY_RATE = new BigDecimal("0.20");
 
     @Autowired
-    private PricingItemRepository itemRepository;
+    private PriceFreezeRepository priceFreezeRepository;
 
     @Autowired
-    private PriceHistoryRepository historyRepository;
+    private PricingItemRepository pricingItemRepository;
 
-    @Autowired
-    private PriceFreezeRepository freezeRepository;
+    // NORMALIZE ITEM TYPE
+    public String normalizeType(String itemType) {
 
-    private String normalizeType(String type) {
-        if (type == null) {
-            throw new IllegalArgumentException("Type must be FLIGHT or HOTEL");
+        if (itemType == null || itemType.isBlank()) {
+            throw new IllegalArgumentException("Item type is required.");
         }
 
-        String normalized = type.trim().toUpperCase();
+        String type = itemType.trim().toUpperCase(Locale.ROOT);
 
-        if (!normalized.equals("FLIGHT") && !normalized.equals("HOTEL")) {
-            throw new IllegalArgumentException("Type must be FLIGHT or HOTEL");
+        if (!type.equals("FLIGHT") && !type.equals("HOTEL")) {
+            throw new IllegalArgumentException("Item type must be FLIGHT or HOTEL.");
         }
 
-        return normalized;
+        return type;
     }
 
-    private PricingItem getItem(String type, Long itemId) {
-        if (itemId == null || itemId <= 0) {
-            throw new IllegalArgumentException("Invalid itemId");
+    // GET PRICING ITEM
+    private PricingItem getPricingItem(String itemType, Long itemId) {
+
+        String type = normalizeType(itemType);
+
+        if (itemId == null) {
+            throw new IllegalArgumentException("Item ID is required.");
         }
 
-        return itemRepository.findByItemTypeAndItemId(type, itemId)
-                .orElseThrow(() -> new IllegalArgumentException("Pricing item not found. Create pricing data first."));
+        return pricingItemRepository
+                .findByItemTypeAndItemId(type, itemId)
+                .orElseThrow(() -> new IllegalArgumentException("Pricing item not found for " + type + " ID " + itemId));
     }
 
-    private BigDecimal amount(BigDecimal base, BigDecimal rate) {
-        return base.multiply(rate).setScale(2, RoundingMode.HALF_UP);
-    }
+    // CALCULATE DYNAMIC PRICE
+    public BigDecimal calculatePrice(PricingItem item) {
 
-    private BigDecimal calculateFinalPrice(PricingItem item) {
-        BigDecimal base = item.getBasePrice();
-        BigDecimal demand = amount(base, item.getDemandAdjustment());
-        BigDecimal seasonal = amount(base, item.getSeasonalAdjustment());
+        if (item == null || item.getBasePrice() == null || item.getBasePrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Base price must be greater than zero.");
+        }
+
+        BigDecimal demand = item.getDemandAdjustment() != null
+                ? item.getDemandAdjustment()
+                : BigDecimal.ZERO;
+
+        BigDecimal seasonal = item.getSeasonalAdjustment() != null
+                ? item.getSeasonalAdjustment()
+                : BigDecimal.ZERO;
+
+        demand = demand.max(MIN_RATE).min(MAX_RATE);
+        seasonal = seasonal.max(MIN_RATE).min(MAX_RATE);
 
         BigDecimal holiday = item.isHoliday()
-                ? amount(base, HOLIDAY_RATE)
-                : BigDecimal.ZERO.setScale(2);
+                ? HOLIDAY_RATE
+                : BigDecimal.ZERO;
 
-        return base.add(demand)
+        BigDecimal multiplier = BigDecimal.ONE
+                .add(demand)
                 .add(seasonal)
-                .add(holiday)
-                .max(BigDecimal.ZERO)
+                .add(holiday);
+
+        if (multiplier.compareTo(BigDecimal.ZERO) < 0) {
+            multiplier = BigDecimal.ZERO;
+        }
+
+        return item.getBasePrice()
+                .multiply(multiplier)
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private PriceFreeze findActiveFreeze(Long userId, String type, Long itemId) {
+    // FIND ACTIVE, UNEXPIRED FREEZE
+    @Transactional
+    public PriceFreeze findActiveFreeze(Long userId, String itemType, Long itemId) {
 
-        if (userId == null) {
-            return null;
+        if (userId == null || itemId == null) {
+            throw new IllegalArgumentException("User ID and item ID are required.");
         }
 
+        String type = normalizeType(itemType);
         LocalDateTime now = LocalDateTime.now();
 
-        return freezeRepository
+        return priceFreezeRepository
                 .findFirstByUserIdAndItemTypeAndItemIdAndStatusOrderByExpiresAtDesc(userId, type, itemId, "ACTIVE")
-                .filter(f -> f.getExpiresAt() != null)
-                .filter(f -> f.getExpiresAt().isAfter(now))
+                .filter(freeze ->
+                        freeze.getExpiresAt() != null && freeze.getExpiresAt().isAfter(now))
                 .orElse(null);
     }
 
+    // GET CURRENT PRICE
     @Transactional
-    public PriceResponse getCurrentPrice(String requestedType, Long itemId, Long userId) {
+    public BigDecimal getCurrentPrice(Long userId, String itemType, Long itemId) {
 
-        String type = normalizeType(requestedType);
-        PricingItem item = getItem(type, itemId);
-        PriceFreeze freeze = findActiveFreeze(userId, type, itemId);
-        BigDecimal base = item.getBasePrice();
-        BigDecimal demand = amount(base, item.getDemandAdjustment());
-        BigDecimal seasonal = amount(base, item.getSeasonalAdjustment());
+        PriceFreeze freeze = findActiveFreeze(userId, itemType, itemId);
 
-        BigDecimal holiday = item.isHoliday()
-                ? amount(base, HOLIDAY_RATE)
-                : BigDecimal.ZERO.setScale(2);
-
-        BigDecimal calculated = calculateFinalPrice(item);
-
-        saveHistoryIfChanged(item, calculated);
-
-        return new PriceResponse(type, itemId, base, demand, seasonal, holiday, 
-        		freeze == null ? calculated : freeze.getLockedPrice(), 
-        				freeze != null, item.getUpdatedAt());
-    }
-
-    private void saveHistoryIfChanged(
-            PricingItem item, BigDecimal finalPrice) {
-
-        List<PriceHistory> records = historyRepository
-                        .findTop30ByItemTypeAndItemIdOrderByRecordedAtDesc(item.getItemType(), item.getItemId());
-
-        PriceHistory latest = records.isEmpty() ? null : records.get(0);
-
-        if (latest != null
-                && latest.getFinalPrice() != null
-                && latest.getBasePrice() != null
-                && latest.getFinalPrice().compareTo(finalPrice) == 0
-                && latest.getBasePrice()
-                        .compareTo(item.getBasePrice()) == 0) {
-            return;
+        if (freeze != null) {
+            return freeze.getLockedPrice();
         }
 
-        BigDecimal change = BigDecimal.ZERO;
+        PricingItem item = getPricingItem(itemType, itemId);
 
-        if (latest != null
-                && latest.getFinalPrice() != null
-                && latest.getFinalPrice()
-                        .compareTo(BigDecimal.ZERO) != 0) {
-
-            change = finalPrice.subtract(latest.getFinalPrice())
-                    .multiply(new BigDecimal("100"))
-                    .divide(latest.getFinalPrice(), 2, RoundingMode.HALF_UP);
-        }
-
-        PriceHistory history = new PriceHistory();
-
-        history.setItemType(item.getItemType());
-        history.setItemId(item.getItemId());
-        history.setBasePrice(item.getBasePrice());
-        history.setDynamicPrice(finalPrice);
-        history.setFinalPrice(finalPrice);
-        history.setChangePercentage(change);
-        history.setDemandAdjustment(item.getDemandAdjustment());
-        history.setSeasonalAdjustment(item.getSeasonalAdjustment());
-        history.setHoliday(item.isHoliday());
-
-        if ("FLIGHT".equalsIgnoreCase(item.getItemType())) {
-            history.setFlightId(item.getItemId());
-            history.setHotelId(null);
-        } else if ("HOTEL".equalsIgnoreCase(item.getItemType())) {
-            history.setHotelId(item.getItemId());
-            history.setFlightId(null);
-        }
-
-        history.setReason(item.isHoliday()
-                ? "Holiday pricing"
-                : "Normal pricing");
-
-        history.setRecordedAt(LocalDateTime.now());
-
-        historyRepository.save(history);
+        return calculatePrice(item);
     }
 
-    @Transactional(readOnly = true)
-    public List<HistoryResponse> getHistory(String requestedType, Long itemId) {
-
-        String type = normalizeType(requestedType);
-        getItem(type, itemId);
-
-        return historyRepository
-                .findTop30ByItemTypeAndItemIdOrderByRecordedAtDesc(type, itemId)
-                .stream()
-                .map(h -> new HistoryResponse(
-                        h.getBasePrice(),
-                        h.getFinalPrice(),
-                        h.getChangePercentage(),
-                        h.getRecordedAt()))
-                .sorted((a, b) ->
-                        a.recordedAt().compareTo(b.recordedAt()))
-                .toList();
-    }
-
+    // CREATE OR REUSE PRICE FREEZE
     @Transactional
-    public FreezeResponse freezePrice(String requestedType, Long itemId, Long userId) {
+    public PriceFreeze freezePrice(Long userId,String itemType, Long itemId) {
 
-        if (userId == null || userId <= 0) {
-            throw new IllegalArgumentException("Valid userId is required");
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID is required.");
         }
 
-        String type = normalizeType(requestedType);
-        PricingItem item = getItem(type, itemId);
-
-        PriceFreeze existing = findActiveFreeze(userId, type, itemId);
-
-        if (existing != null) {
-            System.out.println("Reusing active freeze ID: " + existing.getId());
-            return toFreezeResponse(existing);
+        if (itemId == null) {
+            throw new IllegalArgumentException("Item ID is required.");
         }
 
+        String type = normalizeType(itemType);
         LocalDateTime now = LocalDateTime.now();
 
+        // Reuse a freeze only when it has not expired
+        PriceFreeze existing = priceFreezeRepository
+                .findFirstByUserIdAndItemTypeAndItemIdAndStatusOrderByExpiresAtDesc(userId, type, itemId, "ACTIVE")
+                .orElse(null);
+
+        if (existing != null && existing.getExpiresAt() != null
+                && existing.getExpiresAt().isAfter(now)) {
+            return existing;
+        }
+
+        // Mark the old freeze expired
+        if (existing != null) {
+            existing.setStatus("EXPIRED");
+            priceFreezeRepository.save(existing);
+        }
+
+        // Calculate the latest price
+        PricingItem item = getPricingItem(type, itemId);
+        BigDecimal lockedPrice = calculatePrice(item);
+
+        // Create a new freeze
         PriceFreeze freeze = new PriceFreeze();
         freeze.setUserId(userId);
         freeze.setItemType(type);
         freeze.setItemId(itemId);
-        freeze.setLockedPrice(calculateFinalPrice(item));
+        freeze.setLockedPrice(lockedPrice);
+        freeze.setCreatedAt(now);
         freeze.setExpiresAt(now.plusMinutes(FREEZE_MINUTES));
         freeze.setStatus("ACTIVE");
 
-        PriceFreeze saved = freezeRepository.save(freeze);
-
-        System.out.println("=== PRICE FREEZE CREATED ===");
-        System.out.println("Freeze ID: " + saved.getId());
-        System.out.println("User ID: " + userId);
-        System.out.println("Item Type: " + type);
-        System.out.println("Item ID: " + itemId);
-        System.out.println("Created Time: " + now);
-        System.out.println("Expires At: " + saved.getExpiresAt());
-        System.out.println("============================");
-
-        return toFreezeResponse(saved);
+        return priceFreezeRepository.save(freeze);
     }
 
+    // GET FREEZE BY ID
     @Transactional
-    public FreezeResponse getFreeze(Long freezeId) {
-        if (freezeId == null || freezeId <= 0) {
-            throw new IllegalArgumentException("Invalid freezeId");
+    public PriceFreeze getFreeze(Long freezeId) {
+
+        if (freezeId == null) {
+            throw new IllegalArgumentException("Freeze ID is required.");
         }
 
-        PriceFreeze freeze = freezeRepository.findById(freezeId)
-                .orElseThrow(() -> new IllegalArgumentException("Price freeze not found"));
+        PriceFreeze freeze = priceFreezeRepository
+                .findById(freezeId)
+                .orElseThrow(() -> new IllegalArgumentException("Price freeze not found: " + freezeId));
 
-        if ("ACTIVE".equals(freeze.getStatus()) && (freeze.getExpiresAt() == null
-                || !freeze.getExpiresAt() .isAfter(LocalDateTime.now()))) {
+        if (freeze.getExpiresAt() == null || !freeze.getExpiresAt().isAfter(LocalDateTime.now())) {
 
             freeze.setStatus("EXPIRED");
-            freeze = freezeRepository.save(freeze);
+            priceFreezeRepository.save(freeze);
         }
 
-        return toFreezeResponse(freeze);
+        return freeze;
     }
 
-    private FreezeResponse toFreezeResponse(PriceFreeze freeze) {
-        return new FreezeResponse(freeze.getId(), freeze.getLockedPrice(), freeze.getExpiresAt(), freeze.getStatus());
-    }
-
+    // VALIDATE PRICE BEFORE BOOKING
     @Transactional
-    public PriceResponse updatePricing(String requestedType, Long itemId, AdminUpdateRequest request) {
+    public PriceFreeze validateActiveFreeze(Long userId, String itemType, Long itemId, double requestedPrice) {
 
-        String type = normalizeType(requestedType);
-
-        if (itemId == null || itemId <= 0) {
-            throw new IllegalArgumentException("Invalid itemId");
+        if (!Double.isFinite(requestedPrice) || requestedPrice <= 0) {
+            throw new IllegalArgumentException("Invalid booking price.");
         }
 
-        if (request == null
-                || request.basePrice() == null
-                || request.demandAdjustment() == null
-                || request.seasonalAdjustment() == null) {
-            throw new IllegalArgumentException("All pricing fields are required");
+        PriceFreeze freeze = findActiveFreeze(userId, itemType, itemId);
+
+        if (freeze == null) {
+            throw new IllegalStateException("Price freeze expired or not found. " + "Please refresh the price.");
         }
 
-        if (request.basePrice().compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("basePrice cannot be negative");
+        if (freeze.getLockedPrice() == null) {
+            throw new IllegalStateException("Frozen price is missing.");
         }
 
-        validateRate(request.demandAdjustment(), "demandAdjustment");
-        validateRate(request.seasonalAdjustment(), "seasonalAdjustment");
+        double lockedPrice = freeze.getLockedPrice().doubleValue();
 
-        PricingItem item = itemRepository.findByItemTypeAndItemId(type, itemId)
-                        .orElseGet(PricingItem::new);
-
-        item.setItemType(type);
-        item.setItemId(itemId);
-        item.setBasePrice(request.basePrice().setScale(2, RoundingMode.HALF_UP));
-        item.setDemandAdjustment(request.demandAdjustment());
-        item.setSeasonalAdjustment(request.seasonalAdjustment());
-        item.setHoliday(request.holiday());
-
-        item = itemRepository.save(item);
-        saveHistoryIfChanged(item, calculateFinalPrice(item));
-        return getCurrentPrice(type, itemId, null);
+        if (Math.abs(requestedPrice - lockedPrice) > 0.01) {
+            throw new IllegalArgumentException("Price mismatch. Locked price is "  + lockedPrice);
+        }
+        return freeze;
     }
 
-    private void validateRate(BigDecimal rate, String fieldName) {
-        if (rate.compareTo(MIN_RATE) < 0
-                || rate.compareTo(MAX_RATE) > 0) {
-            throw new IllegalArgumentException(fieldName + " must be between -0.50 and 1.00");
+    // UPDATE PRICING ITEM
+    @Transactional
+    public PricingItem updatePricing(PricingItem item) {
+
+        if (item == null) {
+            throw new IllegalArgumentException("Pricing item is required.");
         }
+
+        normalizeType(item.getItemType());
+
+        if (item.getItemId() == null || item.getBasePrice() == null
+                || item.getBasePrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Valid item ID and base price are required.");
+        }
+
+        if (item.getDemandAdjustment() == null) {
+            item.setDemandAdjustment(BigDecimal.ZERO);
+        }
+
+        if (item.getSeasonalAdjustment() == null) {
+            item.setSeasonalAdjustment(BigDecimal.ZERO);
+        }
+        return pricingItemRepository.save(item);
     }
 }

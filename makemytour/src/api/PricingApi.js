@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API_BASE_URL =
   "https://make-my-tour-clone-springboot-backend.onrender.com";
-  
+
 const pricingApi = axios.create({ baseURL: `${API_BASE_URL}/api/pricing` });
 
 // Get current dynamic price
@@ -44,7 +44,32 @@ export const freezePrice = async (type, itemId, userId) => {
     const response = await pricingApi.post(`/${type}/${itemId}/freeze`, {
       userId: Number(userId),
     });
-    return response.data;
+
+    const data = response.data;
+    console.log("PRICE FREEZE RESPONSE:", data);
+
+    if (!data) {
+      throw new Error("Empty response from price freeze API.");
+    }
+
+    // Support either a full PriceFreeze response or a wrapped response.
+    const freeze = data.freeze ?? data;
+
+    if (freeze.expiresAt) {
+      const expiry = new Date(freeze.expiresAt).getTime();
+
+      if (!Number.isFinite(expiry)) {
+        throw new Error("Invalid freeze expiry time.");
+      }
+
+      if (expiry <= Date.now()) {
+        throw new Error("Price freeze expired. Please refresh the price.");
+      }
+    } else {
+      console.warn("expiresAt is missing. Check the backend freeze response.");
+    }
+
+    return freeze;
   } catch (error) {
     console.error(
       "Freeze price failed:",

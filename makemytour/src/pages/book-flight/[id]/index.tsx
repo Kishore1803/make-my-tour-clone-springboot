@@ -342,38 +342,36 @@ const BookFlightPage = () => {
 
   // Freeze the price using the existing PricingApi.js function.
   const handleFreezePrice = async () => {
-    if (!user?.id) {
-      throw new Error("Please log in to freeze the price.");
-    }
+  if (!user?.id) {
+    throw new Error("Please log in to freeze the price.");
+  }
 
-    const response = await freezePrice("FLIGHT", flight.id, user.id);
-    console.log("PRICE FREEZE RESPONSE:", response);
-    const value = Number(response?.lockedPrice ?? response?.price);
+  const response = await freezePrice("FLIGHT", flight.id, user.id);
+  console.log("PRICE FREEZE RESPONSE:", response);
+  const locked = Number(response?.lockedPrice);
 
-    if (!Number.isFinite(value) || value <= 0) {
-      throw new Error(
-        `Invalid frozen price. Backend response: ${JSON.stringify(response)}`,
-      );
-    }
+  if (!Number.isFinite(locked) || locked <= 0) {
+    throw new Error("Backend did not return a valid locked price.");
+  }
 
-    if (response?.status && response.status !== "ACTIVE") {
-      throw new Error(`Price freeze is not active: ${response.status}`);
-    }
+  if (response?.status !== "ACTIVE") {
+    throw new Error("Price freeze is not active. Please refresh.");
+  }
 
-    if (!response?.expiresAt) {
-      console.warn("Price freeze response has no expiresAt field.");
-      setFreezeExpiresAt(null);
-    } else {
-      const expiry = new Date(response.expiresAt).getTime();
-      if (!Number.isFinite(expiry) || expiry <= Date.now()) {
-        throw new Error("Price freeze expired. Please try again.");
-      }
-      setFreezeExpiresAt(response.expiresAt);
-    }
+  if (!response?.expiresAt) {
+    throw new Error("Freeze expiry time missing from backend response.");
+  }
 
-    setLockedPrice(value);
-    return response;
-  };
+  const expiry = new Date(response.expiresAt).getTime();
+
+  if (!Number.isFinite(expiry) || expiry <= Date.now()) {
+    throw new Error("Price freeze expired. Please refresh.");
+  }
+
+  setLockedPrice(locked);
+  setFreezeExpiresAt(response.expiresAt);
+  return response;
+};
 
   const handleBooking = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
